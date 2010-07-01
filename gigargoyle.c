@@ -34,6 +34,7 @@
 
 #include "config.h"
 #include "packets.h"
+#include "command_line_arguments.h"
 
 pkt_t p; /* network packet from is or qm */
 
@@ -70,6 +71,32 @@ void process_is_l_data(void) {LOG("is_l_data()\n");}
 void process_is_data(void)   {LOG("is_data()\n");}
 void process_web_data(void)  {LOG("web_data()\n");}
 void process_web_l_data(void){LOG("web_l_data()\n");}
+
+/* Contains parsed command line arguments */
+struct arguments arguments;
+
+char doc[] = "Control a moodlamp matrix using a TCP socket";
+char args_doc[] = "";
+
+/* Accepted option */
+struct argp_option options[] = {
+        {"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
+        {"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
+        {"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
+        {"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
+        {"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
+        {"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
+        {"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
+        {"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
+        {"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
+        {"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
+        {"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
+        {"logfile", 'l', "LOGFILE", 0, "Path to log file"},
+        {0}
+};
+
+/* Argument parser */
+struct argp argp = {options, parse_opt, args_doc, doc};
 
 void close_qm(void)
 {
@@ -157,29 +184,29 @@ void daemonize(void)
 	}
 
 	struct stat sb;
-	ret = stat(PID_FILE, &sb);
+	ret = stat(arguments.pid_file, &sb);
 	if ((ret = 0) || (errno != ENOENT))
 	{
 		printf("ERROR: gigargoyle still running, or stale pid file found.\n");
 		printf("       please try restarting after sth like this:\n");
 		printf("\n");
-		printf("kill `cat %s` ; sleep 1 ; rm -f %s\n", PID_FILE, PID_FILE);
+		printf("kill `cat %s` ; sleep 1 ; rm -f %s\n", arguments.pid_file, arguments.pid_file);
 		printf("\n");
 		exit(1);
 	}
 
-	logfd = open(LOG_FILE,
+	logfd = open(arguments.log_file,
 	             O_WRONLY | O_CREAT,
 	             S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (logfd < 0)
 	{
-		printf("ERROR: open(%s): %s\n", LOG_FILE, strerror(errno));
+		printf("ERROR: open(%s): %s\n", arguments.log_file, strerror(errno));
 		exit(1);
 	}
 	logfp = fdopen(logfd, "a");
 	if (!logfp)
 	{
-		printf("ERROR: fdopen(%s): %s\n", LOG_FILE, strerror(errno));
+		printf("ERROR: fdopen(%s): %s\n", arguments.log_file, strerror(errno));
 		exit(1);
 	}
 
@@ -191,7 +218,7 @@ void daemonize(void)
 
 	LOG("gigargoyle starting up as pid %d\n", daemon_pid);
 
-	int pidfile = open(PID_FILE, 
+	int pidfile = open(arguments.pid_file, 
 	                   O_WRONLY | O_CREAT | O_TRUNC,
 	                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
 	if (pidfile < 0)
@@ -209,13 +236,13 @@ void daemonize(void)
 void init_uarts(void)
 {
 	int uerr[4];
-	row[0] = open(ROW_0_UART, O_RDWR | O_EXCL);
+	row[0] = open(arguments.row_0_uart, O_RDWR | O_EXCL);
 	uerr[0] = errno;
-	row[1] = open(ROW_1_UART, O_RDWR | O_EXCL);
+	row[1] = open(arguments.row_1_uart, O_RDWR | O_EXCL);
 	uerr[1] = errno;
-	row[2] = open(ROW_2_UART, O_RDWR | O_EXCL);
+	row[2] = open(arguments.row_2_uart, O_RDWR | O_EXCL);
 	uerr[2] = errno;
-	row[3] = open(ROW_3_UART, O_RDWR | O_EXCL);
+	row[3] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
 	uerr[3] = errno;
 
 	int do_exit = 0;
@@ -243,14 +270,14 @@ void cleanup(void)
 		return;
 
 	if (logfp)
-		LOG("removing pidfile %s\n", PID_FILE);
+		LOG("removing pidfile %s\n", arguments.pid_file);
 
-	ret = unlink(PID_FILE);
+	ret = unlink(arguments.pid_file);
 	if (ret)
 	{
 		if (logfp)
 			LOG("ERROR: couldn't remove %s: %s\n",
-			    PID_FILE,
+			    arguments.pid_file,
 			    strerror(errno));
 	}
 
@@ -281,7 +308,7 @@ void init_qm_l_socket(void)
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family      = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	sa.sin_port        = htons(PORT_QM);
+	sa.sin_port        = htons(arguments.port_qm);
 
 	ret = bind(qm_l, (struct sockaddr *) &sa, sizeof(sa));
 	if (ret < 0)
@@ -318,7 +345,8 @@ void init(void)
 	daemonize();
 	atexit(cleanup);
 	signal(SIGTERM, sighandler);
-	init_uarts();
+	if (!arguments.pretend)
+		init_uarts();
 	init_sockets();
 }
 
@@ -502,7 +530,11 @@ void mainloop(void)
 
 int main(int argc, char ** argv)
 {
+	init_arguments(&arguments);
+	argp_parse(&argp, argc, argv, 0, 0, &arguments);
+
 	init();
+
 	mainloop();
 	return 42;
 }
