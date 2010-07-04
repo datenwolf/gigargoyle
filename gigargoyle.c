@@ -28,6 +28,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <errno.h>
@@ -122,8 +123,9 @@ void close_qm(void)
 void process_qm_l_data(void)  {
 
 	int ret;
-	struct sockaddr_in ca;
+	struct sockaddr_in6 ca;
 	socklen_t salen = sizeof(struct sockaddr);
+        char ipbuf[INET6_ADDRSTRLEN];
 
 	ret = accept(qm_l, (struct sockaddr *)&ca, &salen);
 	if (ret < 0)
@@ -134,13 +136,13 @@ void process_qm_l_data(void)  {
 	}
 	qm = ret;
 	qm_state = QM_CONNECTED;
-	LOG("queuing manager connected from %d.%d.%d.%d:%d\n",
-			(ca.sin_addr.s_addr & 0x000000ff) >>  0,
-			(ca.sin_addr.s_addr & 0x0000ff00) >>  8,
-			(ca.sin_addr.s_addr & 0x00ff0000) >> 16,
-			(ca.sin_addr.s_addr & 0xff000000) >> 24,
-			ntohs(ca.sin_port)
+
+        inet_ntop(AF_INET6, (void *)ca.sin6_addr.s6_addr, ipbuf,
+                  INET6_ADDRSTRLEN);
+	LOG("queuing manager connected from %s:%d\n",
+                        ipbuf, ntohs(ca.sin6_port)
 	   );
+
 	ret = close(qm_l);
 	if (ret)
 	{
@@ -350,9 +352,10 @@ void sighandler(int s)
 void init_qm_l_socket(void)
 {
 	int ret;
-	struct sockaddr_in sa;
+	struct sockaddr_in6 sa;
+        int on = 1;
 
-	qm_l = socket (AF_INET, SOCK_STREAM, 0);
+	qm_l = socket (AF_INET6, SOCK_STREAM, 0);
 	if (qm_l < 0)
 	{
 		LOG("ERROR: socket() for queuing manager: %s\n",
@@ -360,9 +363,17 @@ void init_qm_l_socket(void)
 		exit(1);
 	}
 	memset(&sa, 0, sizeof(sa));
-	sa.sin_family      = AF_INET;
-	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	sa.sin_port        = htons(arguments.port_qm);
+	sa.sin6_family = AF_INET6;
+	sa.sin6_addr   = in6addr_any;
+	sa.sin6_port   = htons(arguments.port_qm);
+
+        if(setsockopt(qm_l, SOL_SOCKET, SO_REUSEADDR,
+                      (char *)&on,sizeof(on)) < 0)
+        {
+            LOG("ERROR: setsockopt() for queuing manager: %s\n",
+		    strerror(errno));
+		exit(1);
+        }
 
 	ret = bind(qm_l, (struct sockaddr *) &sa, sizeof(sa));
 	if (ret < 0)
