@@ -169,6 +169,8 @@ void process_qm_data(void)  {
 		LOG("WARNING: dropping short (%d) packet from QM\n", ret);
 
 	p = (pkt_t *) buf;
+        p->hdr = ntohl(p->hdr);
+        p->pkt_len = ntohl(p->pkt_len);
 	p->data = (uint8_t *) &buf[8];
 	in_packet(p, ret);
 }
@@ -187,7 +189,7 @@ void wr_fifo(pkt_t * p)
 
 	if (p->pkt_len > FIFO_WIDTH)
 	{
-		LOG("WARNING: dropping long packet, hdr %x\n", p->hdr);
+		LOG("WARNING: dropping long packet, pkt_len %x\n", p->pkt_len);
 		return;
 	}
 	memcpy(fifo[fifo_wr], p, p->pkt_len);
