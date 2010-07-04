@@ -197,6 +197,7 @@ void wr_fifo(pkt_t * p)
 	fifo_wr %= FIFO_DEPTH;
 	if (fifo_wr == fifo_rd)
 		fifo_state = FIFO_FULL;
+	LOG("FIFO[%4.4d:%4.4d]: stored pkt type %8.8x\n", fifo_rd, fifo_wr, p->hdr);
 }
 
 pkt_t * rd_fifo(void)
@@ -377,12 +378,17 @@ void init_qm_l_socket(void)
 		exit(1);
         }
 
-	ret = bind(qm_l, (struct sockaddr *) &sa, sizeof(sa));
-	if (ret < 0)
+	int bind_retries = 4;
+	while (bind_retries--)
 	{
-		LOG("ERROR: bind() for queuing manager: %s\n",
-		    strerror(errno));
-		exit(1);
+		ret = bind(qm_l, (struct sockaddr *) &sa, sizeof(sa));
+		if (ret < 0)
+		{
+			LOG("WARNING: bind() for queuing manager: %s... retrying %d\n",
+					strerror(errno), bind_retries);
+			usleep(1000000);
+		}else
+			break;
 	}
 
 	ret = listen(qm_l, 8);
@@ -401,7 +407,7 @@ void init_sockets(void)
 
 void init_fifo(void)
 {
-	fifo = malloc(FIFO_DEPTH);
+	fifo = malloc(FIFO_DEPTH * (sizeof(fifo)));
 	if (!fifo)
 	{
 		LOG("ERROR: out of memory (fifo)\n");

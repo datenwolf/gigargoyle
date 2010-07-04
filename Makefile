@@ -1,8 +1,8 @@
-CFLAGS=-O2 -Wall
+CFLAGS=-O2 -Wall -g
 
 OBJS=gigargoyle.o command_line_arguments.o packets.o
 
-all: gigargoyle
+all:gigargoyle testpacket
 
 gigargoyle: ${OBJS}
 	${CC} ${CFLAGS} -o gigargoyle ${OBJS}
