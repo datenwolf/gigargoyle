@@ -111,7 +111,7 @@ void process_web_l_data(void)
 }
 
 /* Contains parsed command line arguments */
-struct arguments arguments;
+extern struct arguments arguments;
 
 char doc[] = "Control a moodlamp matrix using a TCP socket";
 char args_doc[] = "";
@@ -156,9 +156,8 @@ void close_qm(void)
 void process_qm_l_data(void)  {
 
 	int ret;
-	struct sockaddr_in6 ca;
+	struct sockaddr_in ca;
 	socklen_t salen = sizeof(struct sockaddr);
-        char ipbuf[INET6_ADDRSTRLEN];
 
 	ret = accept(qm_l, (struct sockaddr *)&ca, &salen);
 	if (ret < 0)
@@ -371,10 +370,10 @@ void sighandler(int s)
 void init_qm_l_socket(void)
 {
 	int ret;
-	struct sockaddr_in6 sa;
+	struct sockaddr_in sa;
         int on = 1;
 
-	qm_l = socket (AF_INET6, SOCK_STREAM, 0);
+	qm_l = socket (AF_INET, SOCK_STREAM, 0);
 	if (qm_l < 0)
 	{
 		LOG("ERROR: socket() for queuing manager: %s\n",
@@ -382,9 +381,9 @@ void init_qm_l_socket(void)
 		exit(1);
 	}
 	memset(&sa, 0, sizeof(sa));
-	sa.sin6_family = AF_INET6;
-	sa.sin6_addr   = in6addr_any;
-	sa.sin6_port   = htons(arguments.port_qm);
+	sa.sin_family = AF_INET;
+        sa.sin_addr.s_addr   = INADDR_ANY;
+	sa.sin_port   = htons(arguments.port_qm);
 
         if(setsockopt(qm_l, SOL_SOCKET, SO_REUSEADDR,
                       (char *)&on,sizeof(on)) < 0)
@@ -507,8 +506,7 @@ void init(void)
 
 	atexit(cleanup);
 	signal(SIGTERM, sighandler);
-	if (!arguments.pretend)
-		init_uarts();
+        init_uarts();
 	init_sockets();
 	init_fifo();
 
