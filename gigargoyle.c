@@ -744,9 +744,10 @@ void mainloop(void)
 		/* if frame_duration is over run next frame */
 
 		uint64_t tmp64 = gettimeofday64();
-		if ((frame_remaining <= tmp64 - frame_last_time) ||
+		if ((frame_duration <= tmp64 - frame_last_time) ||
 		    (frame_last_time == 0))
 		{
+                  /* LOG("Frame timing error: %f%%\n", 100*(1-(double)frame_duration/(frame_remaining+frame_duration))); */
 			frame_last_time = tmp64;
 			frame_remaining = frame_duration;
 			next_frame();
