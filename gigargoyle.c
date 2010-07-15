@@ -31,10 +31,12 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <sys/time.h>
 #include <errno.h>
 
 #include "config.h"
 #include "packets.h"
+#include "fifo.h"
 #include "gigargoyle.h"
 #include "command_line_arguments.h"
 
@@ -49,21 +51,14 @@ int is;     /* file handle for instant streamer accept()ed  */
 int is_state = IS_NOT_CONNECTED;
 
 int web_l;  /* file handle for web clients listen()          */
-int web[MAX_WEB_CLIENTS];  /* file handle for web clients accept()ed        */
+int web[MAX_WEB_CLIENTS];  /* file handle for web clients accept()ed */
+int web_state = WEB_NOT_CONNECTED;
 
 int daemon_pid;
 
-uint8_t ** fifo;
-uint32_t   fifo_rd    = 0;
-uint32_t   fifo_wr    = 0;
-int        fifo_state = FIFO_EMPTY;
-
 /* moodlamp control stuff */
-uint32_t frame_duration = 10;  /* us per frame, modified by
-                                * PKT_TYPE_SET_FRAME_RATE or
-                                * PKT_TYPE_SET_DURATION */
-uint8_t source = SOURCE_LOCAL; /* changed when QM or IS data come in
-                                * or fifo runs empty */
+uint32_t frame_remaining;
+uint64_t frame_last_time = 0;
 
 char * buf; /* general purpose buffer */
 #define BUF_SZ 4096
@@ -76,8 +71,44 @@ void init_qm_l_socket(void);
 void process_row_data(int i) {LOG("row_data()\n");}
 void process_is_l_data(void) {LOG("is_l_data()\n");}
 void process_is_data(void)   {LOG("is_data()\n");}
-void process_web_data(void)  {LOG("web_data()\n");}
-void process_web_l_data(void){LOG("web_l_data()\n");}
+
+void process_web_l_data(void)
+{
+	int ret;
+	struct sockaddr_in ca;
+	socklen_t salen = sizeof(struct sockaddr);
+
+	ret = accept(web_l, (struct sockaddr *)&ca, &salen);
+	if (ret < 0)
+	{
+		LOG("ERROR: accept() in  process_web_l_data(): %s\n",
+				strerror(errno));
+		exit(1);
+	}
+	int i;
+	for (i=0; i<MAX_WEB_CLIENTS; i++){
+		if (web[i] == -1)
+		{
+			web[i] = ret;
+			LOG("WEB: wizard%d materialized in front of gigargoyle from %d.%d.%d.%d:%d\n",
+					i,
+					(ca.sin_addr.s_addr & 0x000000ff) >>  0,
+					(ca.sin_addr.s_addr & 0x0000ff00) >>  8,
+					(ca.sin_addr.s_addr & 0x00ff0000) >> 16,
+					(ca.sin_addr.s_addr & 0xff000000) >> 24,
+					ntohs(ca.sin_port)
+			   );
+			return;
+		}
+	}
+	LOG("WEB: WARNING: no more clients possible! had to reject %d.%d.%d.%d:%d\n",
+		(ca.sin_addr.s_addr & 0x000000ff) >>  0,
+		(ca.sin_addr.s_addr & 0x0000ff00) >>  8,
+		(ca.sin_addr.s_addr & 0x00ff0000) >> 16,
+		(ca.sin_addr.s_addr & 0xff000000) >> 24,
+		ntohs(ca.sin_port)
+	   );
+}
 
 /* Contains parsed command line arguments */
 struct arguments arguments;
@@ -117,7 +148,9 @@ void close_qm(void)
 	}
 	init_qm_l_socket();
 	qm_state = QM_NOT_CONNECTED;
-	LOG("listening for new QM connections\n");
+	if (source == SOURCE_QM)
+		source = SOURCE_LOCAL;
+	LOG("MAIN: listening for new QM connections\n");
 }
 
 void process_qm_l_data(void)  {
@@ -130,17 +163,24 @@ void process_qm_l_data(void)  {
 	ret = accept(qm_l, (struct sockaddr *)&ca, &salen);
 	if (ret < 0)
 	{
-		LOG("ERROR: accept() in  process_qm_data(): %s\n",
+		LOG("ERROR: accept() in  process_qm_l_data(): %s\n",
 				strerror(errno));
 		exit(1);
 	}
 	qm = ret;
 	qm_state = QM_CONNECTED;
 
-        inet_ntop(AF_INET6, (void *)ca.sin6_addr.s6_addr, ipbuf,
-                  INET6_ADDRSTRLEN);
-	LOG("queuing manager connected from %s:%d\n",
-                        ipbuf, ntohs(ca.sin6_port)
+	if (source != SOURCE_IS)
+	{
+		source = SOURCE_QM;
+		flush_fifo();
+	}
+	LOG("MAIN: queuing manager connected from %d.%d.%d.%d:%d\n",
+			(ca.sin_addr.s_addr & 0x000000ff) >>  0,
+			(ca.sin_addr.s_addr & 0x0000ff00) >>  8,
+			(ca.sin_addr.s_addr & 0x00ff0000) >> 16,
+			(ca.sin_addr.s_addr & 0xff000000) >> 24,
+			ntohs(ca.sin_port)
 	   );
 
 	ret = close(qm_l);
@@ -166,7 +206,7 @@ void process_qm_data(void)  {
 		exit(1);
 	}
 	if (ret < 8) /* FIXME not the netcat way */
-		LOG("WARNING: dropping short (%d) packet from QM\n", ret);
+		LOG("MAIN: WARNING: dropping short (%d) packet from QM\n", ret);
 
 	p = (pkt_t *) buf;
         p->hdr = ntohl(p->hdr);
@@ -175,41 +215,16 @@ void process_qm_data(void)  {
 	in_packet(p, ret);
 }
 
-/* fifo stuph */
-
-void wr_fifo(pkt_t * p)
+uint64_t gettimeofday64(void)
 {
-	if (fifo_state == FIFO_FULL)
-	{
-		LOG("WARNING: fifo full, dropping packet, hdr %x\n", p->hdr);
-		return;
-	}
-	if (fifo_state == FIFO_FULL)
-		fifo_state = FIFO_HALF;
-
-	if (p->pkt_len > FIFO_WIDTH)
-	{
-		LOG("WARNING: dropping long packet, pkt_len %x\n", p->pkt_len);
-		return;
-	}
-	memcpy(fifo[fifo_wr], p, p->pkt_len);
-	fifo_wr++;
-	fifo_wr %= FIFO_DEPTH;
-	if (fifo_wr == fifo_rd)
-		fifo_state = FIFO_FULL;
-	LOG("FIFO[%4.4d:%4.4d]: stored pkt type %8.8x\n", fifo_rd, fifo_wr, p->hdr);
-}
-
-pkt_t * rd_fifo(void)
-{
-	return NULL;
-}
-
-void flush_fifo(void)
-{
-	fifo_rd = 0;
-	fifo_wr = 0;
-	fifo_state = FIFO_EMPTY;
+	uint64_t timestamp;
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	timestamp  =  tv.tv_sec;
+	timestamp +=  tv.tv_usec / 1000000;
+	timestamp <<= 32;
+	timestamp +=  tv.tv_usec % 1000000;
+	return timestamp;
 }
 
 void open_logfile(void)
@@ -274,6 +289,7 @@ void daemonize(void)
 
 	daemon_pid = getpid();
 
+	LOG("MAIN: gigargoyle starting up as pid %d\n", daemon_pid);
 	int pidfile = open(arguments.pid_file, 
 	                   O_WRONLY | O_CREAT | O_TRUNC,
 	                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
@@ -329,7 +345,7 @@ void cleanup(void)
 		return;
 
 	if (logfp)
-		LOG("removing pidfile %s\n", arguments.pid_file);
+		LOG("MAIN: removing pidfile %s\n", arguments.pid_file);
 
 	ret = unlink(arguments.pid_file);
 	if (ret)
@@ -341,7 +357,7 @@ void cleanup(void)
 	}
 
 	if (logfp)
-		LOG("exiting.\n");
+		LOG("MAIN: exiting.\n");
 	cleanup_done = 1;
 }
 
@@ -384,11 +400,17 @@ void init_qm_l_socket(void)
 		ret = bind(qm_l, (struct sockaddr *) &sa, sizeof(sa));
 		if (ret < 0)
 		{
-			LOG("WARNING: bind() for queuing manager: %s... retrying %d\n",
+			LOG("MAIN: WARNING: bind() for queuing manager: %s... retrying %d\n",
 					strerror(errno), bind_retries);
 			usleep(1000000);
 		}else
 			break;
+	}
+	if (ret < 0)
+	{
+		LOG("MAIN: WARNING: bind() for queuing manager failed. running without. no movie playing possible\n");
+		qm_state = QM_ERROR;
+		return;
 	}
 
 	ret = listen(qm_l, 8);
@@ -400,30 +422,55 @@ void init_qm_l_socket(void)
 	}
 }
 
+void init_web_l_socket(void)
+{
+	int ret;
+	struct sockaddr_in sa;
+
+	web_l = socket (AF_INET, SOCK_STREAM, 0);
+	if (web_l < 0)
+	{
+		LOG("ERROR: socket() for web clients: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+	memset(&sa, 0, sizeof(sa));
+	sa.sin_family      = AF_INET;
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
+	sa.sin_port        = htons(PORT_WEB);
+
+	int bind_retries = 4;
+	while (bind_retries--)
+	{
+		ret = bind(web_l, (struct sockaddr *) &sa, sizeof(sa));
+		if (ret < 0)
+		{
+			LOG("MAIN: WARNING: bind() for web clients: %s... retrying %d\n",
+					strerror(errno), bind_retries);
+			usleep(1000000);
+		}else
+			break;
+	}
+	if (ret < 0)
+	{
+		LOG("MAIN: WARNING: bind() for web clients failed. running without. no live streaming possible\n");
+		web_state = WEB_ERROR;
+		return;
+	}
+
+	ret = listen(web_l, 8);
+	if (ret < 0)
+	{
+		LOG("ERROR: listen() for web clients: %s\n",
+		    strerror(errno));
+		exit(1);
+	}
+}
+
 void init_sockets(void)
 {
 	init_qm_l_socket();
-}
-
-void init_fifo(void)
-{
-	fifo = malloc(FIFO_DEPTH * (sizeof(fifo)));
-	if (!fifo)
-	{
-		LOG("ERROR: out of memory (fifo)\n");
-		exit(1);
-	}
-
-	int i;
-	for (i=0; i<FIFO_DEPTH; i++)
-	{
-		fifo[i] = malloc(FIFO_WIDTH);
-		if (!fifo[i])
-		{
-			LOG("ERROR: out of memory (fifo %d)\n", i);
-			exit(1);
-		}
-	}
+	init_web_l_socket();
 }
 
 void init(void)
@@ -464,6 +511,11 @@ void init(void)
 		init_uarts();
 	init_sockets();
 	init_fifo();
+
+	source = SOURCE_LOCAL;
+	frame_duration = STARTUP_FRAME_DURATION;  /* us per frame */
+
+	memset(web, -1, MAX_WEB_CLIENTS);
 }
 
 int max_int(int a, int b)
@@ -486,11 +538,13 @@ void mainloop(void)
 
 	struct timeval tv;
 
+	frame_remaining = frame_duration;
+
 	while(0Xacab)
 	{
 		/* prepare for select */
 		tv.tv_sec  = 0;
-		tv.tv_usec = frame_duration;
+		tv.tv_usec = frame_remaining;
 
 		FD_ZERO(&rfd);
 		FD_ZERO(&wfd);
@@ -506,17 +560,20 @@ void mainloop(void)
 			nfds = max_int(nfds, row[i]);
 
 		/* qm queuing manager, max 1 */
-		if (qm_state == QM_NOT_CONNECTED)
+		if (qm_state != QM_ERROR)
 		{
-			FD_SET(qm_l, &rfd);
-			FD_SET(qm_l, &efd);
-			nfds = max_int(nfds, qm_l);
-		}
-		if (qm_state == QM_CONNECTED)
-		{
-			FD_SET(qm, &rfd);
-			FD_SET(qm, &efd);
-			nfds = max_int(nfds, qm);
+			if (qm_state == QM_NOT_CONNECTED)
+			{
+				FD_SET(qm_l, &rfd);
+				FD_SET(qm_l, &efd);
+				nfds = max_int(nfds, qm_l);
+			}
+			if (qm_state == QM_CONNECTED)
+			{
+				FD_SET(qm, &rfd);
+				FD_SET(qm, &efd);
+				nfds = max_int(nfds, qm);
+			}
 		}
 
 		/* is instant streamer client, max 1 */
@@ -534,9 +591,22 @@ void mainloop(void)
 		}
 
 		/* web */
-		FD_SET(web_l, &rfd);
-		FD_SET(web_l, &efd);
-		nfds = max_int(nfds, web_l);
+		if (web_state != WEB_ERROR)
+		{
+			FD_SET(web_l, &rfd);
+			FD_SET(web_l, &efd);
+			nfds = max_int(nfds, web_l);
+
+			for (i=0; i< MAX_WEB_CLIENTS; i++)
+			{
+				if (web[i]>=0)
+				{
+					FD_SET(web[i], &rfd);
+					FD_SET(web[i], &efd);
+					nfds = max_int(nfds, web[i]);
+				}
+			}
+		}
 
 
 		/* select () */
@@ -576,7 +646,7 @@ void mainloop(void)
 		{
 			if (FD_ISSET(qm, &efd))
 			{
-				LOG("WARNING: select() on queuing manager connection: %s\n",
+				LOG("MAIN: WARNING: select() on queuing manager connection: %s\n",
 						strerror(errno));
 				close_qm();
 			}
@@ -607,6 +677,18 @@ void mainloop(void)
 			LOG("ERROR: select() on web client: %s\n",
 					strerror(errno));
 			exit(1);
+		}
+		for (i=0; i< MAX_WEB_CLIENTS; i++)
+		{
+			if (web[i]>=0)
+			{
+				if (FD_ISSET(web[i], &efd))
+				{
+					close(web[i]); /* disregarding errors */
+					web[i] = -1;
+					LOG("WEB: wizard%d stepped into his own trap and seeks for help elsewhere now. mana=852, health=100%%\n", i);
+				}
+			}
 		}
 
 		/* data handling */
@@ -641,12 +723,44 @@ void mainloop(void)
 		}
 		if (FD_ISSET(web_l, &rfd))
 			process_web_l_data();
+
+		for (i=0; i< MAX_WEB_CLIENTS; i++)
+		{
+			if (web[i]>=0)
+			{
+				if (FD_ISSET(web[i], &rfd))
+				{
+					/* kill anyone who sends data, stfu   */
+					close(web[i]); /* disregarding errors */
+					web[i] = -1;
+
+					LOG("WEB: ordinary wizard%d tried to hit gigargoyle %ld times. gigargoyle stood still for %ld seconds and won the fight. mana=852, health=100%%\n",
+					   i,
+					   random()&0xac,
+					   (random()&0xb)+1
+					   );
+				}
+			}
+		}
+
+		/* if frame_duration is over run next frame */
+
+		uint64_t tmp64 = gettimeofday64();
+		if ((frame_remaining <= tmp64 - frame_last_time) ||
+		    (frame_last_time == 0))
+		{
+			frame_last_time = tmp64;
+			frame_remaining = frame_duration;
+			next_frame();
+		}else{
+			frame_remaining = frame_last_time + frame_duration - tmp64;
+		}
 	}
 }
 
 void gigargoyle_shutdown(void)
 {
-	LOG("received a shutdown packet - exiting\n");
+	LOG("MAIN: received a shutdown packet - exiting\n");
 	exit(0);
 }
 

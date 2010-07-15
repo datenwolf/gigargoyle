@@ -29,18 +29,21 @@ int logfd;    /* logfile descriptor */
 FILE * logfp;
 #define LOG(fmt, args...) {fprintf(logfp, fmt, ##args); fflush(logfp);}
 
-int row[4]; /* file handles for the uarts */
+uint8_t source;           /* changed when QM or IS data come in
+                           * or fifo runs empty */
 
-uint8_t tmp_screen[ACAB_X][ACAB_Y][3];
+uint32_t frame_duration;  /* us per frame, modified by
+                           * PKT_TYPE_SET_FRAME_RATE or
+                           * PKT_TYPE_SET_DURATION */
 
-/* fifo */
-#define FIFO_EMPTY 0x1
-#define FIFO_HALF  0x2
-#define FIFO_FULL  0x3
-                      
-pkt_t * rd_fifo(void);
-void wr_fifo(pkt_t * p);
-void flush_fifo(void);
+int row[4];               /* file handles for the uarts */
+
+uint8_t tmp_screen8 [ACAB_X][ACAB_Y][3];
+uint8_t tmp_screen16[ACAB_X][ACAB_Y][6];
+
+uint64_t gettimeofday64(void);
+
+uint8_t get_source(void);
 
 void gigargoyle_shutdown(void);
 

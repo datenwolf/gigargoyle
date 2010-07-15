@@ -66,10 +66,15 @@ typedef struct pkt_s {
 /* QM socket states (queuing manager) */
 #define QM_NOT_CONNECTED 0x01
 #define QM_CONNECTED     0x02
+#define QM_ERROR         0x80
 
 /* IS socket states (instant streamer) */
 #define IS_NOT_CONNECTED 0x01
 #define IS_CONNECTED     0x02
+
+/* WEB socket states (instant streamer) */
+#define WEB_NOT_CONNECTED 0x01
+#define WEB_ERROR         0x80
 
 /* gigargoyle streaming source */
 #define SOURCE_QM        0x01
@@ -78,5 +83,6 @@ typedef struct pkt_s {
 
 /* prototypes from packets.c */
 void in_packet(pkt_t * p, uint32_t plen);
+void next_frame(void);
 
 #endif /* PACKETS_H */
