@@ -5,7 +5,7 @@
 
 #define COLS 24
 #define ROWS 4
-#define FRAME_DURATION 1.0f/30*1e6
+#define FRAME_DURATION 1.0f/5*1e6
 
 int main(int argc, char *argv[]) {
   gg_frame *f;
@@ -14,24 +14,26 @@ int main(int argc, char *argv[]) {
   int i, col, row;
 
   f = gg_init_frame(COLS, ROWS, 3);
-  s = gg_init_socket("localhost", 0xabac);
+  s = gg_init_socket("10.0.0.176", 0xabac);
 
   /* 30 fps */
-  /* gg_set_duration(s, FRAME_DURATION); */
+  gg_set_duration(s, FRAME_DURATION);
 
-  for (i = 0; i < 100; ++i) {
+  for (i = 0; i < 1000; ++i) {
 
     for (col = 0; col < COLS; ++col) {
       for (row = 0; row < ROWS; ++row) {
         gg_set_pixel_color(f, col, row,
-                           i*10%255, i*10%255, i*10%255);
+                           row*10, col*4, 0);
       }
     }
 
-    printf("Sent frame %d\n", i);
-    gg_send_frame(s, f);
+    gg_send_command(s, PKT_TYPE_SET_SCREEN_WHT);
 
-    usleep(FRAME_DURATION);
+    printf("Sent frame %d\n", i);
+    /* gg_send_frame(s, f); */
+
+    usleep(FRAME_DURATION-100);
   }
 
   gg_deinit_frame(f);

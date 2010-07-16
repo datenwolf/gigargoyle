@@ -354,6 +354,8 @@ void cleanup(void)
 			    strerror(errno));
 	}
 
+        /* FIXME close sockets */
+
 	if (logfp)
 		LOG("MAIN: exiting.\n");
 	cleanup_done = 1;
