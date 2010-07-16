@@ -49,7 +49,7 @@ void in_packet(pkt_t * p, uint32_t plen)
 		return; /* drop short packets */
 	}
 
-	if ((p->hdr & PKT_MASK_VERSION) != VERSION)
+	if ((p->hdr & PKT_MASK_VERSION) != VERSION << VERSION_SHIFT)
 	{
 		LOG("PKTS: WARNING: dropping pkt with invalid version, hdr %x\n", p->hdr);
 		return; /* drop wrong version packets */
@@ -155,9 +155,6 @@ void set_screen_blk(void)
 void set_screen_rgb8(uint8_t s[ACAB_X][ACAB_Y][3])
 {
 	int ix, iy;
-
-        if (arguments.pretend)
-                LOG("Set screen\n");
 
 	for (ix=0; ix < ACAB_X; ix++)
 	{
