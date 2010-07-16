@@ -13,25 +13,25 @@ int main(int argc, char *argv[]) {
 
   int i, col, row;
 
-  f = gg_init_frame(24, 4, 8);
+  f = gg_init_frame(COLS, ROWS, 3);
   s = gg_init_socket("localhost", 0xabac);
 
   /* 30 fps */
-  gg_set_duration(s, FRAME_DURATION);
+  /* gg_set_duration(s, FRAME_DURATION); */
 
   for (i = 0; i < 100; ++i) {
 
     for (col = 0; col < COLS; ++col) {
       for (row = 0; row < ROWS; ++row) {
-        gg_set_pixel_color(f, row, col,
-                           i%255, i%255, i%255);
+        gg_set_pixel_color(f, col, row,
+                           i*10%255, i*10%255, i*10%255);
       }
     }
 
     printf("Sent frame %d\n", i);
     gg_send_frame(s, f);
 
-    /* usleep(FRAME_DURATION); */
+    usleep(FRAME_DURATION);
   }
 
   gg_deinit_frame(f);

@@ -51,8 +51,16 @@ void gg_deinit_frame(gg_frame *f) {
 
 gg_socket *gg_init_socket(const char *host, int port) {
   int ret;
+  gg_socket *sock;
   struct sockaddr_in sa;
   struct hostent *adr;
+
+  sock = (gg_socket *)malloc(sizeof(gg_socket));
+  if (sock == NULL) {
+    fprintf(stderr, "ERROR: allocate socket: %s\n", strerror(errno));
+    exit(1);
+  }
+
   int s = socket(AF_INET, SOCK_STREAM, 0);
   if (s < 0)
   {
@@ -80,6 +88,10 @@ gg_socket *gg_init_socket(const char *host, int port) {
     fprintf(stderr, "ERROR: connect(): %s\n", strerror(errno));
     exit(1);
   }
+
+  sock->s = s;
+
+  return sock;
 }
 
 int gg_deinit_socket(gg_socket *s) {
@@ -111,6 +123,7 @@ pkt_t *create_packet(unsigned int version,
 
   p->hdr = VERSION << VERSION_SHIFT;
   p->hdr |= options;
+  p->hdr |= opcode;
 
   p->data = (uint8_t *)malloc(payload_len);
 
@@ -148,10 +161,10 @@ void gg_set_duration(gg_socket *s, unsigned int duration) {
   
   packet = serialize_packet(p);
 
-  /* ret = write(s->s, packet, p->pkt_len); */
-  /* if (ret != p->pkt_len) { */
-  /*   fprintf(stderr, "Warning: Could not send packet\n"); */
-  /* } */
+  ret = write(s->s, packet, p->pkt_len);
+  if (ret != p->pkt_len) {
+    fprintf(stderr, "Warning: Could not send packet\n");
+  }
 
   free(p->data);
   free(p);
@@ -165,10 +178,10 @@ void gg_set_pixel_color(gg_frame *f,
                         unsigned char g,
                         unsigned char b) {
   uint8_t *data = f->packet->data;
-  
-  /* *(data + col*f->rows*f->depth + row*f->depth + 0) = r; */
-  /* *(data + col*f->rows*f->depth + row*f->depth + 1) = g; */
-  /* *(data + col*f->rows*f->depth + row*f->depth + 2) = b; */
+
+  *(data + row*f->cols*f->depth + col*f->depth + 0) = r;
+  *(data + row*f->cols*f->depth + col*f->depth + 1) = g;
+  *(data + row*f->cols*f->depth + col*f->depth + 2) = b;
 }
 
 void gg_set_frame_color(gg_frame *f,
@@ -187,11 +200,33 @@ void gg_set_frame_color(gg_frame *f,
 void gg_send_frame(gg_socket *s, gg_frame *f) {
   int ret;
   uint8_t *packet;
+  pkt_t *dblbuf;
   
+  /* Send data */
   packet = serialize_packet(f->packet);
 
-  /* ret = write(s->s, packet, f->packet->pkt_len); */
-  /* if (ret != f->packet->pkt_len) { */
-  /*   fprintf(stderr, "Warning: Could not send packet\n"); */
-  /* } */
+  ret = write(s->s, packet, f->packet->pkt_len);
+  if (ret != f->packet->pkt_len) {
+    fprintf(stderr, "Warning: Could not send packet: %d, %d\n", ret, f->packet->pkt_len);
+  }
+
+  free(packet);
+
+  /* Send flip command */
+  dblbuf = create_packet(VERSION,
+                    PKT_MASK_DBL_BUF | PKT_MASK_RGB8,
+                    PKT_TYPE_FLIP_DBL_BUF,
+                    0, 0, 0);
+  
+  packet = serialize_packet(dblbuf);
+
+  ret = write(s->s, packet, dblbuf->pkt_len);
+  if (ret != dblbuf->pkt_len) {
+    fprintf(stderr, "Warning: Could not send packet\n");
+  }
+
+  /* Free used structs */
+  free(dblbuf->data);
+  free(dblbuf);
+  free(packet);
 }

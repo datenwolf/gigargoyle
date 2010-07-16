@@ -62,6 +62,33 @@ uint64_t frame_last_time = 0;
 char * buf; /* general purpose buffer */
 #define BUF_SZ 4096
 
+/* Contains parsed command line arguments */
+extern struct arguments arguments;
+
+char doc[] = "Control a moodlamp matrix using a TCP socket";
+char args_doc[] = "";
+
+/* Accepted option */
+struct argp_option options[] = {
+        {"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
+        {"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
+        {"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
+        {"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
+        {"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
+        {"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
+        {"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
+        {"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
+        {"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
+        {"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
+        {"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
+        {"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
+        {"logfile", 'l', "LOGFILE", 0, "Path to log file"},
+        {0}
+};
+
+/* Argument parser */
+struct argp argp = {options, parse_opt, args_doc, doc};
+
 /* prototypes we need */
 void init_qm_l_socket(void);
 
@@ -108,33 +135,6 @@ void process_web_l_data(void)
 		ntohs(ca.sin_port)
 	   );
 }
-
-/* Contains parsed command line arguments */
-extern struct arguments arguments;
-
-char doc[] = "Control a moodlamp matrix using a TCP socket";
-char args_doc[] = "";
-
-/* Accepted option */
-struct argp_option options[] = {
-        {"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
-        {"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
-        {"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
-        {"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
-        {"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
-        {"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
-        {"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
-        {"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
-        {"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
-        {"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
-        {"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
-        {"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
-        {"logfile", 'l', "LOGFILE", 0, "Path to log file"},
-        {0}
-};
-
-/* Argument parser */
-struct argp argp = {options, parse_opt, args_doc, doc};
 
 void close_qm(void)
 {
