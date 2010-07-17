@@ -655,7 +655,7 @@ void mainloop(void)
 		{
 			LOG("ERROR: select(): %s\n",
 					strerror(errno));
-			exit(1);
+			//exit(1);
 		}
 
 		for (i=0; i<4; i++)
