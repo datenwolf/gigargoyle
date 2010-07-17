@@ -220,6 +220,7 @@ void process_qm_data(void) {
 		if(ret_pkt == -1) {
 		    off += plen;
 		} else {
+                    LOG("PKTS: new frame\n");
 		    if((int)p.pkt_len <= plen) {
 			plen -= (int)p.pkt_len;
 			memmove(buf, buf + p.pkt_len, plen);
