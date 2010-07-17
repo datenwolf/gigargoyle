@@ -66,13 +66,15 @@ void gg_set_frame_color(gg_frame *f,
                         unsigned char r,
                         unsigned char g,
                         unsigned char b);
+/* Send a command without payload*/
+void gg_send_command(gg_socket *s, uint8_t opcode);
 
 /* Send a frame and flip buffer */
 void gg_send_frame(gg_socket *s, gg_frame *f);
 
 pkt_t *create_packet(unsigned int version,
                      uint32_t options,
-                     uint16_t opcode,
+                     uint8_t opcode,
                      unsigned int cols,
                      unsigned int rows,
                      unsigned int depth);

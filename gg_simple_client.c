@@ -100,7 +100,7 @@ int gg_deinit_socket(gg_socket *s) {
 
 pkt_t *create_packet(unsigned int version,
                      uint32_t options,
-                     uint16_t opcode,
+                     uint8_t opcode,
                      unsigned int cols,
                      unsigned int rows,
                      unsigned int depth) {
@@ -195,6 +195,24 @@ void gg_set_frame_color(gg_frame *f,
     for (row = 0; row < f->rows; ++row) {
       gg_set_pixel_color(f, row, col, r, g, b);
     }
+  }
+}
+
+void gg_send_command(gg_socket *s, uint8_t opcode) {
+  int ret;
+  pkt_t *p;
+  uint8_t *packet;
+
+  p = create_packet(VERSION,
+                    PKT_MASK_DBL_BUF | PKT_MASK_RGB8,
+                    opcode,
+                    0, 0, 0);
+  
+  packet = serialize_packet(p);
+
+  ret = write(s->s, packet, p->pkt_len);
+  if (ret != p->pkt_len) {
+    fprintf(stderr, "Warning: Could not send packet\n");
   }
 }
 
