@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 #include <stdlib.h>
 
 #include "config.h"
@@ -159,6 +160,7 @@ void set_screen_rgb8(uint8_t s[ACAB_X][ACAB_Y][3])
 	{
 		for (iy=0; iy < ACAB_Y; iy++)
 		{
+                  /* LOG("%x %x %x, ", s[ix][iy][0], s[ix][iy][1], s[ix][iy][2]); */
 			set_pixel_xy_rgb8(
 			                s[ix][iy][0],
 			                s[ix][iy][1],
@@ -166,7 +168,9 @@ void set_screen_rgb8(uint8_t s[ACAB_X][ACAB_Y][3])
 					ix, iy
 				    );
 		}
+                /* LOG("\n"); */
 	}
+        /* LOG("\n\n"); */
 }
 
 void set_screen_rgb16(uint16_t s[ACAB_X][ACAB_Y][3])
@@ -258,20 +262,29 @@ void next_frame(void)
 		return;
 	}
 
+        LOG("next frame type %x\n", p->hdr & PKT_MASK_TYPE);
+
 	switch(p->hdr & PKT_MASK_TYPE)
 	{
 		case PKT_TYPE_SET_FADE_RATE:
 		case PKT_TYPE_SET_PIXEL:
 		case PKT_TYPE_FLIP_DBL_BUF:
+                        break;
+
 		case PKT_TYPE_TEXT:
 		case PKT_TYPE_SET_FONT:
 		case PKT_TYPE_SET_SCREEN_BLK:
                         set_screen_blk();
                         break;
+
 		case PKT_TYPE_SET_SCREEN_WHT:
+                        set_screen_blk();
+                        break;
+
 		case PKT_TYPE_SET_SCREEN_RND_BW:
 			set_screen_rnd_bw();
 			break;
+
 		case PKT_TYPE_SET_SCREEN_RND_COL:
 			set_screen_rnd_col();
 			break;
@@ -315,7 +328,8 @@ void next_frame(void)
 				LOG("PKTS: WARNING: dropping short SET_DURATION pkt\n");
 				return;
 			}
-			frame_duration = *((uint32_t *)p->data);
+			frame_duration = ntohl(*((uint32_t *)(p->data)));
+                        LOG("PKRS: New duration %d\n", ntohl(*((uint32_t *)(p->data))));
 			break;
 
 		/* out-of-band immediate commands follow */
