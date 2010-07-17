@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <unistd.h>
-#include <math.h>
 
 #include "gg_simple_client.h"
 
 #define COLS 24
 #define ROWS 4
-#define FRAME_DURATION (uint32_t)(1.0f/30*1e6)
+#define FRAME_DURATION 1.0f/5*1e6
 
 int main(int argc, char *argv[]) {
   gg_frame *f;
@@ -18,22 +17,23 @@ int main(int argc, char *argv[]) {
   s = gg_init_socket("localhost", 0xabac);
 
   /* 30 fps */
-  printf("duration %d\n", FRAME_DURATION);
-  gg_set_duration(s, FRAME_DURATION);
+  /* gg_set_duration(s, FRAME_DURATION); */
 
-  for (i = 0; i < 500; ++i) {
+  for (i = 0; i < 1000; ++i) {
 
     for (col = 0; col < COLS; ++col) {
       for (row = 0; row < ROWS; ++row) {
         gg_set_pixel_color(f, col, row,
-                           (uint8_t)(127*(sin(i/5.0)+1)),
-                           (uint8_t)(127*(sin(i/10.0)+1)),
-                           (uint8_t)(127*(sin(i/20.0)+1)));
+                           row*10, col*4, 0);
       }
     }
 
+    gg_send_command(s, PKT_TYPE_SET_SCREEN_WHT);
+
     printf("Sent frame %d\n", i);
-    gg_send_frame(s, f);
+    /* gg_send_frame(s, f); */
+
+    /* usleep(FRAME_DURATION-100); */
   }
 
   gg_deinit_frame(f);
