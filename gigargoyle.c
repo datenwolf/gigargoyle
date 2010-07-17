@@ -40,8 +40,6 @@
 #include "gigargoyle.h"
 #include "command_line_arguments.h"
 
-pkt_t * p; /* network packet from is or qm */
-
 int qm_l;   /* file handle for the queing manager listen()   */
 int qm;     /* file handle for the queing manager accept()ed */
 int qm_state = QM_NOT_CONNECTED;
@@ -189,9 +187,11 @@ void process_qm_l_data(void)  {
 }
 
 void process_qm_data(void) {
+        pkt_t p;
+        pkt_t *pt;
         static int off = 0;
 	int ret;
-	LOG("read\n");
+
 	ret = read(qm, buf+off, BUF_SZ-off);
 	if (ret == 0)
 	{
@@ -206,27 +206,23 @@ void process_qm_data(void) {
 		exit(1);
 	}
 
-	p = (pkt_t *) buf;
-	p->data = (uint8_t *) &buf[8];
+	pt = (pkt_t *) buf;
 
 	int plen = ret+off;
 	int ret_pkt;
         do {
-                if(off == 0) {
-                    p->hdr = ntohl(p->hdr);
-                    p->pkt_len = ntohl(p->pkt_len);
-                }
+                p.hdr = ntohl(pt->hdr);
+                p.pkt_len = ntohl(pt->pkt_len);
+	        p.data = (uint8_t *) &(pt->data);
 
-		ret_pkt = in_packet(p, plen);
+		ret_pkt = in_packet(&p, plen);
 
 		if(ret_pkt == -1) {
-		    LOG("too short\n");
 		    off += plen;
 		} else {
-		    LOG("frameproc\n");
-		    if((int)p->pkt_len <= plen) {
-			plen -= (int)p->pkt_len;
-			memmove(buf, buf + p->pkt_len, plen);
+		    if((int)p.pkt_len <= plen) {
+			plen -= (int)p.pkt_len;
+			memmove(buf, buf + p.pkt_len, plen);
 		    }
 		    off = 0;
 		}
@@ -513,7 +509,7 @@ void init(void)
 		       strerror(errno));
 		exit(1);
 	}
-	p = malloc(sizeof(pkt_t));
+	pkt_t *p = malloc(sizeof(pkt_t));
 	if (!p)
 	{
 		printf("ERROR: couldn't alloc %d packet bytes: %s\n",
