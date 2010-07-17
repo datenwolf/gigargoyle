@@ -441,6 +441,7 @@ void init_web_l_socket(void)
 {
 	int ret;
 	struct sockaddr_in sa;
+        int on = 1;
 
 	web_l = socket (AF_INET, SOCK_STREAM, 0);
 	if (web_l < 0)
@@ -453,6 +454,14 @@ void init_web_l_socket(void)
 	sa.sin_family      = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
 	sa.sin_port        = htons(PORT_WEB);
+
+        if(setsockopt(web_l, SOL_SOCKET, SO_REUSEADDR,
+                      (char *)&on,sizeof(on)) < 0)
+        {
+            LOG("ERROR: setsockopt() for web clients: %s\n",
+		    strerror(errno));
+		exit(1);
+        }
 
 	int bind_retries = 4;
 	while (bind_retries--)
