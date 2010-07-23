@@ -87,11 +87,11 @@ int in_packet(pkt_t * p, uint32_t plen)
 }
 
 void set_pixel_xy_rgb8(
-                  uint16_t r,
-                  uint16_t g,
-                  uint16_t b,
-                  uint16_t x,
-                  uint16_t y
+                  uint8_t r,
+                  uint8_t g,
+                  uint8_t b,
+                  uint8_t x,
+                  uint8_t y
                  ){
 	static uint64_t last_timestamp[4] =
 	                {0, 0, 0, 0}; /* FIXME flexible row/bus mapping */
@@ -152,7 +152,7 @@ void set_screen_blk(void)
 	}
 }
 
-void set_screen_rgb8(uint8_t s[ACAB_X][ACAB_Y][3])
+void set_screen_rgb8(uint8_t s[ACAB_Y][ACAB_X][3])
 {
 	int ix, iy;
 
@@ -308,7 +308,7 @@ void next_frame(void)
 					LOG(" %d != %d\n", p->pkt_len, 8 + 3 * ACAB_X * ACAB_Y);
 					return;
 				}
-				set_screen_rgb8((uint8_t (*)[ACAB_Y][3])p->data);
+				set_screen_rgb8((uint8_t (*)[ACAB_X][3])p->data);
 			}
 
 			break;
