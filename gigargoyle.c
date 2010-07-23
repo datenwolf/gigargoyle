@@ -786,8 +786,8 @@ void mainloop(void)
 		{
                   /* LOG("Frame timing error: %f%%\n", 100*(1-(double)frame_duration/(frame_remaining+frame_duration))); */
 			frame_last_time = tmp64;
-			frame_remaining = frame_duration;
 			next_frame();
+			frame_remaining = frame_duration;
 		}else{
 			frame_remaining = frame_last_time + frame_duration - tmp64;
 		}

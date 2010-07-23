@@ -328,7 +328,7 @@ void next_frame(void)
 				LOG("PKTS: WARNING: dropping short SET_DURATION pkt\n");
 				return;
 			}
-			frame_duration = ntohl(*((uint32_t *)(p->data)));
+			frame_duration = 1000*ntohl(*((uint32_t *)(p->data)));
                         LOG("PKRS: New duration %d\n", ntohl(*((uint32_t *)(p->data))));
 			break;
 
