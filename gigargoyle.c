@@ -237,7 +237,7 @@ uint64_t gettimeofday64(void)
 	gettimeofday(&tv, NULL);
 	timestamp  =  tv.tv_sec;
 	timestamp +=  tv.tv_usec / 1000000;
-	timestamp <<= 32;
+	timestamp *= 1000000;
 	timestamp +=  tv.tv_usec % 1000000;
 	return timestamp;
 }
@@ -578,8 +578,8 @@ void mainloop(void)
 	while(0Xacab)
 	{
 		/* prepare for select */
-		tv.tv_sec  = 0;
-		tv.tv_usec = frame_remaining;
+		tv.tv_sec  = frame_remaining/1000;
+		tv.tv_usec = frame_remaining - frame_remaining/1000*1000;
 
 		FD_ZERO(&rfd);
 		FD_ZERO(&wfd);
@@ -786,8 +786,8 @@ void mainloop(void)
 		{
                   /* LOG("Frame timing error: %f%%\n", 100*(1-(double)frame_duration/(frame_remaining+frame_duration))); */
 			frame_last_time = tmp64;
-			next_frame();
 			frame_remaining = frame_duration;
+			next_frame();
 		}else{
 			frame_remaining = frame_last_time + frame_duration - tmp64;
 		}

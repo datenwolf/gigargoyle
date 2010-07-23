@@ -258,6 +258,13 @@ void flip_double_buffer(void)
 void next_frame(void)
 {
 	pkt_t * p;
+
+        /*
+         * yeah, we use goto here! deal with it!
+         * problem: we don't want to wait after processing a control packet,
+         *          like setting framerate or duration
+         */
+again:
 	p = rd_fifo();
 
 	if (p == NULL)
@@ -324,7 +331,7 @@ void next_frame(void)
 				return;
 			}
 			frame_duration = 1000000 / (*((uint32_t *)p->data));
-			break;
+			goto again;
 
 		case PKT_TYPE_SET_DURATION:
 			if (p->pkt_len != 12)
@@ -333,8 +340,8 @@ void next_frame(void)
 				return;
 			}
 			frame_duration = 1000*ntohl(*((uint32_t *)(p->data)));
-                        LOG("PKRS: New duration %d\n", ntohl(*((uint32_t *)(p->data))));
-			break;
+                        LOG("PKRS: New duration %d\n", frame_duration);
+			goto again;
 
 		/* out-of-band immediate commands follow */
 		/* but were handled already async when entering gigargoyle, see in_packet() */
