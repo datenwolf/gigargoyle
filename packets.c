@@ -161,10 +161,14 @@ void set_screen_rgb8(uint8_t s[ACAB_Y][ACAB_X][3])
 		for (iy=0; iy < ACAB_Y; iy++)
 		{
                   /* LOG("%x %x %x, ", s[ix][iy][0], s[ix][iy][1], s[ix][iy][2]); */
+			int mx=ix, my=iy;
+			if(iy % 2 == 1)
+			    mx = ACAB_X - 1 - ix;
+
 			set_pixel_xy_rgb8(
-			                s[ix][iy][0],
-			                s[ix][iy][1],
-			                s[ix][iy][2],
+			                s[my][mx][0],
+			                s[my][mx][1],
+			                s[my][mx][2],
 					ix, iy
 				    );
 		}
