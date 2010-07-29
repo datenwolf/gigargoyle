@@ -124,9 +124,9 @@ void set_pixel_xy_rgb8(
 		LOG("PKTS: WARNING: write(bus %d) = %d != 9\n", y, ret);
 	last_timestamp[y] = timestamp;
 
-	shadow_screen[x][y][0] = r;
-	shadow_screen[x][y][1] = g;
-	shadow_screen[x][y][2] = b;
+	shadow_screen[y][x][0] = r;
+	shadow_screen[y][x][1] = g;
+	shadow_screen[y][x][2] = b;
 }
 
 void set_pixel_xy_rgb16(
