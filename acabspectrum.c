@@ -20,12 +20,17 @@
 
 #define COLS 24
 #define ROWS 4
-#define FRAME_DURATION 1.0f/30*1e3
+#define FRAME_DURATION 1.0f/1000*1e3
+#define LP_LEN 5
+
 
 jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
 gg_frame *frame;
+
+double old_amplitudes[LP_LEN][COLS] = {0.0};
+double filtered_amplitudes[COLS] = {0.0};
 
 int f_to_z(double f) {
   return 13.0*atan(.00076*f)+3.5*atan((f/7500.0)*(f/7500.0));
@@ -45,23 +50,11 @@ void interp_color(int ri1, int gi1, int bi1,
   *bo = lambda * bi1 + (1-lambda) * bi2;
 }
 
-  fftw_complex *in_cplx, *out_cplx;
-  fftw_plan p;
+fftw_complex *in_cplx, *out_cplx;
+fftw_plan p;
 
-
-/**
- * The process callback for this JACK application is called in a
- * special realtime thread once for each audio cycle.
- *
- * This client does nothing more than copy data from its input
- * port to its output port. It will exit when stopped by 
- * the user (e.g. using Ctrl-C on a unix-ish operating system)
- */
-int
-process (jack_nframes_t nframes, void *arg)
-{
+int process (jack_nframes_t nframes, void *arg) {
   jack_default_audio_sample_t *in, *out;
-
 
   int i;
   in = jack_port_get_buffer (input_port, nframes);
@@ -70,34 +63,60 @@ process (jack_nframes_t nframes, void *arg)
           sizeof (jack_default_audio_sample_t) * nframes);
         
   for (i = 0; i < nframes; ++i){
-    /* Hamming and log*/
-    in_cplx[i][0] = log((0.54-0.46*sin(2*M_PI*in[i]/(nframes-1)))+1);
+    /* Hamming */
+    in_cplx[i][0] = in[i]*(0.54-0.46*sin(2*M_PI*i/(nframes-1)));
     in_cplx[i][1] = 0.0;
   }
 
-  fftw_execute(p); /* repeat as needed */
+  /* Do the fft */
+  fftw_execute(p);
 
   double acc = 0;
+  double acc_i = 0;
+  double acc_r = 0;
   int log_idx = 0;
   double f = 0;
   int z = 0;
 
   gg_set_frame_color(frame, 0, 0, 0);
 
+  /* Move old amplitudes */
+  int k, l;
+  for (k = 0; k < LP_LEN-1; ++k) {
+    for (l = 0; l < COLS; ++l) {
+      old_amplitudes[k][l] = old_amplitudes[k+1][l];
+    }
+  }
+
+  /* Calculate boxcar mean */
+  for (l = 0; l < COLS; ++l) {
+    for (k = 0; k < LP_LEN; ++k) {    
+      filtered_amplitudes[l] += old_amplitudes[k][l];
+    }
+    filtered_amplitudes[l] /= LP_LEN;
+  }
+
   for (i = 0; i < 512; ++i){
     double val = out_cplx[i][0]*out_cplx[i][0] + out_cplx[i][1]*out_cplx[i][1];
-    acc += val;
+    double val_i = out_cplx[i][0];
+    double val_r = out_cplx[i][1];
+    acc_i += val_i;
+    acc_r += val_r;
 
     f = i/512.0*22.05e3;
 
     /* time to add up */
     if (f > z_to_f(z)) {
-      acc = 100*sqrt(acc);
-      
+
+      acc = sqrt(acc_i*acc_i + acc_r*acc_r);
+
+      /* Set current amplitude */
+      old_amplitudes[LP_LEN-1][z] = acc;
+
       printf("\e[%dm%1d\e[0m", (int)(acc+30), 0);
 
       int col = 0;
-      col = 4*atan(acc/10.0);
+      col = (int)round(4*atan(filtered_amplitudes[z]/20.0)/(M_PI/2.0));
       if (col > 4) col = 4;
       
       int j;
@@ -126,18 +145,19 @@ process (jack_nframes_t nframes, void *arg)
             b = 0;
             break;
           }
-          gg_set_pixel_color(frame, z, 3-j, r, g, b);
+          gg_set_pixel_color(frame, z, ROWS-1-j, r, g, b);
         } else {
-          gg_set_pixel_color(frame, z, 3-j, 0, 0, 0);
+          gg_set_pixel_color(frame, z, ROWS-1-j, 0, 0, 0);
         }
-        /* gg_set_pixel_color(frame, z, j, acc*3, acc*3, acc*3); */
       }
 
       ++z;
       acc = 0;
+      acc_i = 0;
+      acc_r = 0;
     }
   }
-
+  
   gg_send_frame((gg_socket *)arg, frame);
   printf("\n");
 
