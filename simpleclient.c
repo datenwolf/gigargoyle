@@ -21,7 +21,6 @@ int main(int argc, char *argv[]) {
   gg_set_duration(s, FRAME_DURATION);
 
   for (i = 0; i < 2000; ++i) {
-
     for (col = 0; col < COLS; ++col) {
       for (row = 0; row < ROWS; ++row) {
         gg_set_pixel_color(f, col, row,

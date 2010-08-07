@@ -23,7 +23,6 @@
 #define FRAME_DURATION 1.0f/1000*1e3
 #define LP_LEN 5
 
-
 jack_port_t *input_port;
 jack_port_t *output_port;
 jack_client_t *client;
@@ -107,7 +106,6 @@ int process (jack_nframes_t nframes, void *arg) {
 
     /* time to add up */
     if (f > z_to_f(z)) {
-
       acc = sqrt(acc_i*acc_i + acc_r*acc_r);
 
       /* Set current amplitude */

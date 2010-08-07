@@ -52,7 +52,7 @@ int in_packet(pkt_t * p, uint32_t plen)
 	{
 		LOG("PKTS: WARNING: got short packet (%d < %d)\n",
 		    p->pkt_len, plen
-		   );
+		);
 		return -1;
 	}
 
@@ -87,11 +87,12 @@ int in_packet(pkt_t * p, uint32_t plen)
 }
 
 void set_pixel_xy_rgb8(
+                  uint32_t hdr,
                   uint8_t r,
                   uint8_t g,
                   uint8_t b,
-                  uint8_t x,
-                  uint8_t y
+                  uint16_t x,
+                  uint16_t y
                  ){
 	static uint64_t last_timestamp[4] =
 	                {0, 0, 0, 0}; /* FIXME flexible row/bus mapping */
@@ -118,6 +119,9 @@ void set_pixel_xy_rgb8(
 	bus_buf[8] = 0x31;
 	int ret;
 
+	if (hdr & PKT_MASK_DBL_BUF)
+		bus_buf[3] = 'P';
+
 	timestamp = gettimeofday64();
 
 	if (last_timestamp[y] + MIN_GAP_BUS_TRANSFERS > timestamp)
@@ -134,6 +138,7 @@ void set_pixel_xy_rgb8(
 }
 
 void set_pixel_xy_rgb16(
+                  uint32_t hdr,
                   uint16_t r,
                   uint16_t g,
                   uint16_t b,
@@ -141,31 +146,32 @@ void set_pixel_xy_rgb16(
                   uint16_t y
                  ){
 	/* FIXME */
-	set_pixel_xy_rgb8(r, g, b, x, y);
+	set_pixel_xy_rgb8(hdr, r, g, b, x, y);
 }
 
 void set_screen_blk(void)
 {
 	int ix, iy;
-	for (ix=0; ix < ACAB_X; ix++)
+	for (iy=0; iy < ACAB_Y; iy++)
 	{
-		for (iy=0; iy < ACAB_Y; iy++)
+		for (ix=0; ix < ACAB_X; ix++)
 		{
-			set_pixel_xy_rgb8(0, 0, 0, ix, iy);
+			set_pixel_xy_rgb8(0, 0, 0, 0, ix, iy); /* FIXME 0 */
 		}
 	}
 }
 
-void set_screen_rgb8(uint8_t s[ACAB_Y][ACAB_X][3])
+void set_screen_rgb8(uint32_t hdr, uint8_t s[ACAB_Y][ACAB_X][3])
 {
 	int ix, iy;
 
-	for (ix=0; ix < ACAB_X; ix++)
+	for (iy=0; iy < ACAB_Y; iy++)
 	{
-		for (iy=0; iy < ACAB_Y; iy++)
+		for (ix=0; ix < ACAB_X; ix++)
 		{
-                  /* LOG("%x %x %x, ", s[ix][iy][0], s[ix][iy][1], s[ix][iy][2]); */
+			/* LOG("%x %x %x, ", s[ix][iy][0], s[ix][iy][1], s[ix][iy][2]); */
 			set_pixel_xy_rgb8(
+			                hdr,
 			                s[iy][ix][0],
 			                s[iy][ix][1],
 			                s[iy][ix][2],
@@ -177,17 +183,18 @@ void set_screen_rgb8(uint8_t s[ACAB_Y][ACAB_X][3])
         /* LOG("\n\n"); */
 }
 
-void set_screen_rgb16(uint16_t s[ACAB_X][ACAB_Y][3])
+void set_screen_rgb16(uint32_t hdr, uint16_t s[ACAB_Y][ACAB_X][3])
 {
 	int ix, iy;
-	for (ix=0; ix < ACAB_X; ix++)
+	for (iy=0; iy < ACAB_Y; iy++)
 	{
-		for (iy=0; iy < ACAB_Y; iy++)
+		for (ix=0; ix < ACAB_X; ix++)
 		{
 			set_pixel_xy_rgb16(
-			                s[ix][iy][0],
-			                s[ix][iy][1],
-			                s[ix][iy][2],
+			                hdr,
+			                s[iy][ix][0],
+			                s[iy][ix][1],
+			                s[iy][ix][2],
 					ix, iy
 				    );
 		}
@@ -197,38 +204,38 @@ void set_screen_rgb16(uint16_t s[ACAB_X][ACAB_Y][3])
 void set_screen_rnd_bw(void)
 {
 	int ix, iy;
-	for (ix=0; ix < ACAB_X; ix++)
+	for (iy=0; iy < ACAB_Y; iy++)
 	{
-		for (iy=0; iy < ACAB_Y; iy++)
+		for (ix=0; ix < ACAB_X; ix++)
 		{
 			if (random()&1)
 			{
-				tmp_screen8[ix][iy][0] = 0xff;
-				tmp_screen8[ix][iy][1] = 0xff;
-				tmp_screen8[ix][iy][2] = 0xff;
+				tmp_screen8[iy][ix][0] = 0xff;
+				tmp_screen8[iy][ix][1] = 0xff;
+				tmp_screen8[iy][ix][2] = 0xff;
 			}else{
-				tmp_screen8[ix][iy][0] = 0x00;
-				tmp_screen8[ix][iy][1] = 0x00;
-				tmp_screen8[ix][iy][2] = 0x00;
+				tmp_screen8[iy][ix][0] = 0x00;
+				tmp_screen8[iy][ix][1] = 0x00;
+				tmp_screen8[iy][ix][2] = 0x00;
 			}
 		}
 	}
-	set_screen_rgb8(tmp_screen8);
+	set_screen_rgb8(0, tmp_screen8); /* FIXME 0 */
 }
 
 void set_screen_rnd_col(void)
 {
 	int ix, iy;
-	for (ix=0; ix < ACAB_X; ix++)
+	for (iy=0; iy < ACAB_Y; iy++)
 	{
-		for (iy=0; iy < ACAB_Y; iy++)
+		for (ix=0; ix < ACAB_X; ix++)
 		{
-			tmp_screen8[ix][iy][0] = random();
-			tmp_screen8[ix][iy][1] = random();
-			tmp_screen8[ix][iy][2] = random();
+			tmp_screen8[iy][ix][0] = random();
+			tmp_screen8[iy][ix][1] = random();
+			tmp_screen8[iy][ix][2] = random();
 		}
 	}
-	set_screen_rgb8(tmp_screen8);
+	set_screen_rgb8(0, tmp_screen8); /* FIXME 0 */
 }
 
 void flip_double_buffer_on_bus(int b)
@@ -259,11 +266,11 @@ void next_frame(void)
 {
 	pkt_t * p;
 
-        /*
-         * yeah, we use goto here! deal with it!
-         * problem: we don't want to wait after processing a control packet,
-         *          like setting framerate or duration
-         */
+	/*
+	 * yeah, we use goto here! deal with it!
+	 * problem: we don't want to wait after processing a control packet,
+	 *          like setting framerate or duration
+	 */
 again:
 	p = rd_fifo();
 
@@ -309,7 +316,7 @@ again:
 					LOG(" %d != %d\n", p->pkt_len, 8 + 2 * 3 * ACAB_X * ACAB_Y);
 					return;
 				}
-				set_screen_rgb16((uint16_t (*)[ACAB_Y][3])p->data);
+				set_screen_rgb16(p->hdr, (uint16_t (*)[ACAB_X][3])p->data);
 			}
 			if (p->hdr & PKT_MASK_RGB8)
 			{
@@ -319,7 +326,7 @@ again:
 					LOG(" %d != %d\n", p->pkt_len, 8 + 3 * ACAB_X * ACAB_Y);
 					return;
 				}
-				set_screen_rgb8((uint8_t (*)[ACAB_X][3])p->data);
+				set_screen_rgb8(p->hdr, (uint8_t (*)[ACAB_X][3])p->data);
 			}
 
 			break;
@@ -341,6 +348,7 @@ again:
 			}
 			frame_duration = 1000*ntohl(*((uint32_t *)(p->data)));
                         LOG("PKRS: New duration %d\n", frame_duration);
+			frame_duration = ntohl(*((uint32_t *)p->data));
 			goto again;
 
 		/* out-of-band immediate commands follow */
@@ -361,17 +369,48 @@ void serve_web_clients(void)
 {
 	int ret;
 	int i;
+
+	struct timeval tv;
+	tv.tv_sec  = 0;
+	tv.tv_usec = 0;
+
+	fd_set rfd;
+	fd_set wfd;
+	fd_set efd;
+
 	for (i=0; i<MAX_WEB_CLIENTS; i++)
 	{
 		if (web[i] != -1)
 		{
-			//LOG("PKTS: serving wizard%d\n", i);
-			ret = write(web[i], shadow_screen, ACAB_X*ACAB_Y*3);
-			if (ret != ACAB_X*ACAB_Y*3)
+			FD_ZERO(&rfd);
+			FD_ZERO(&wfd);
+			FD_ZERO(&efd);
+
+			FD_SET(web[i], &wfd);
+			FD_SET(web[i], &efd);
+
+			select(web[i]+1, &rfd, &wfd, &efd, &tv);
+
+			if (FD_ISSET(web[i], &efd))
 			{
-				LOG("PKTS: gigargoyle told wizard%d to move aside. she refused and is now dead.\n", i);
 				close(web[i]);
 				web[i] = -1;
+				LOG("WEB: wizard%d disagrees no more\n", i);
+			}
+
+			if (FD_ISSET(web[i], &wfd))
+			{
+				ret = write(web[i], shadow_screen, ACAB_X*ACAB_Y*3);
+				if (ret != ACAB_X*ACAB_Y*3)
+				{
+					LOG("PKTS: gigargoyle told wizard%d to move aside. she refused and is now dead.\n", i);
+					close(web[i]);
+					web[i] = -1;
+				}
+			}else{
+				close(web[i]);
+				web[i] = -1;
+				LOG("WEB: wizard%d got some special treatment\n", i);
 			}
 		}
 	}

@@ -134,6 +134,33 @@ void process_web_l_data(void)
 	   );
 }
 
+/* Contains parsed command line arguments */
+extern struct arguments arguments;
+
+char doc[] = "Control a moodlamp matrix using a TCP socket";
+char args_doc[] = "";
+
+/* Accepted option */
+struct argp_option options[] = {
+	{"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
+	{"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
+	{"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
+	{"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
+	{"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
+	{"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
+	{"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
+	{"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
+	{"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
+	{"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
+	{"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
+	{"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
+	{"logfile", 'l', "LOGFILE", 0, "Path to log file"},
+	{0}
+};
+
+/* Argument parser */
+struct argp argp = {options, parse_opt, args_doc, doc};
+
 void close_qm(void)
 {
 	int ret;
@@ -218,14 +245,13 @@ void process_qm_data(void) {
 		ret_pkt = in_packet(&p, plen);
 
 		if(ret_pkt == -1) {
-		    off += plen;
+			off += plen;
 		} else {
-                    LOG("PKTS: new frame\n");
-		    if((int)p.pkt_len <= plen) {
-			plen -= (int)p.pkt_len;
-			memmove(buf, buf + p.pkt_len, plen);
-		    }
-		    off = 0;
+			if((int)p.pkt_len <= plen) {
+				plen -= (int)p.pkt_len;
+				memmove(buf, buf + p.pkt_len, plen);
+			}
+			off = 0;
 		}
 	} while(ret_pkt == 0 && plen != 0);
 }
@@ -397,14 +423,15 @@ void init_qm_l_socket(void)
 		exit(1);
 	}
 	memset(&sa, 0, sizeof(sa));
-	sa.sin_family = AF_INET;
-        sa.sin_addr.s_addr   = INADDR_ANY;
-	sa.sin_port   = htons(arguments.port_qm);
+	sa.sin_family      = AF_INET;
+	sa.sin_addr.s_addr = htonl(INADDR_ANY);
+	sa.sin_port        = htons(arguments.port_qm);
 
-        if(setsockopt(qm_l, SOL_SOCKET, SO_REUSEADDR,
-                      (char *)&on,sizeof(on)) < 0)
-        {
-            LOG("ERROR: setsockopt() for queuing manager: %s\n",
+	ret = 1;
+	if(setsockopt(qm_l, SOL_SOCKET, SO_REUSEADDR,
+				(char *)&ret, sizeof(ret)) < 0)
+	{
+		LOG("ERROR: setsockopt() for queuing manager: %s\n",
 		    strerror(errno));
 		exit(1);
         }
@@ -609,6 +636,7 @@ void mainloop(void)
 			}
 		}
 
+#if 0 /* FIXME: IS */
 		/* is instant streamer client, max 1 */
 		if (is_state == IS_NOT_CONNECTED)
 		{
@@ -622,6 +650,7 @@ void mainloop(void)
 			FD_SET(is, &efd);
 			nfds = max_int(nfds, is);
 		}
+#endif
 
 		/* web */
 		if (web_state != WEB_ERROR)
@@ -685,6 +714,7 @@ void mainloop(void)
 			}
 		}
 
+#if 0 /* FIXME: IS */
 		/* is instant streamer client, max 1 */
 		if (is_state == IS_NOT_CONNECTED)
 		{
@@ -704,6 +734,7 @@ void mainloop(void)
 				exit(1);
 			}
 		}
+#endif
 
 		if (FD_ISSET(web_l, &efd))
 		{
@@ -744,6 +775,7 @@ void mainloop(void)
 				process_qm_data();
 		}
 
+#if 0 /* FIXME: IS */
 		if (is_state == IS_NOT_CONNECTED)
 		{
 			if (FD_ISSET(is_l, &rfd))
@@ -754,6 +786,7 @@ void mainloop(void)
 			if (FD_ISSET(is, &rfd))
 				process_is_data();
 		}
+#endif
 		if (FD_ISSET(web_l, &rfd))
 			process_web_l_data();
 
@@ -784,8 +817,8 @@ void mainloop(void)
 		{
                   /* LOG("Frame timing error: %f%%\n", 100*(1-(double)frame_duration/(frame_remaining+frame_duration))); */
 			frame_last_time = tmp64;
-			frame_remaining = frame_duration;
 			next_frame();
+			frame_remaining = frame_duration;
 		}else{
 			frame_remaining = frame_last_time + frame_duration - tmp64;
 		}
