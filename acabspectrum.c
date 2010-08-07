@@ -28,7 +28,7 @@ jack_port_t *output_port;
 jack_client_t *client;
 gg_frame *frame;
 
-double old_amplitudes[LP_LEN][COLS] = {0.0};
+double old_amplitudes[LP_LEN][COLS] = {{0.0}};
 double filtered_amplitudes[COLS] = {0.0};
 
 int f_to_z(double f) {
@@ -73,7 +73,7 @@ int process (jack_nframes_t nframes, void *arg) {
   double acc = 0;
   double acc_i = 0;
   double acc_r = 0;
-  int log_idx = 0;
+  //int log_idx = 0;
   double f = 0;
   int z = 0;
 
@@ -96,7 +96,7 @@ int process (jack_nframes_t nframes, void *arg) {
   }
 
   for (i = 0; i < 512; ++i){
-    double val = out_cplx[i][0]*out_cplx[i][0] + out_cplx[i][1]*out_cplx[i][1];
+    //double val = out_cplx[i][0]*out_cplx[i][0] + out_cplx[i][1]*out_cplx[i][1];
     double val_i = out_cplx[i][0];
     double val_r = out_cplx[i][1];
     acc_i += val_i;
