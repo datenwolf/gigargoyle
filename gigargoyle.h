@@ -24,20 +24,65 @@
 
 #include <stdio.h>
 
-/* logging */
-int logfd;    /* logfile descriptor */
 FILE * logfp;
 #define LOG(fmt, args...) {fprintf(logfp, fmt, ##args); fflush(logfp);}
 
-uint8_t source;           /* changed when QM or IS data come in
-                           * or fifo runs empty */
+typedef struct streamingsource_s
+{
+	int       listener;       /* file handle for the QM or IS listen()   */
+	int       sock;           /* file handle for the QM or IS accept()ed */
+	int       state;
+
+	int       input_offset;
+	uint8_t * buf;
+} streamingsource_t;
+
+typedef struct web_s
+{
+	int listener;              /* file handle for web clients listen()   */
+	int * sock;                /* file handle for web clients accept()ed */
+	int state;
+} web_t;
+
+typedef struct fifo_s
+{
+	uint8_t ** fifo;
+	uint32_t   rd;
+	uint32_t   wr;
+	int        state;
+
+	pkt_t    * packet; /* local buffer for a single fifo pkt */
+
+} fifo_t;
+
+typedef struct gigargoyle_s
+{
+	int     logfd;            /* logfile descriptor */
+
+	pid_t   daemon_pid;
+
+	uint8_t source;           /* one of SOURCE_LOCAL, SOURCE_QM, SOURCE_IS
+	                           * changed when QM or IS data come in
+	                           * or fifo runs empty */
+
+	streamingsource_t * qm;   /* queuing manager */
+	streamingsource_t * is;   /* instant streaming */
+	streamingsource_t * ss;   /* actual streaming source. either is NULL,
+	                             or points to qm or is */
+
+	fifo_t            * fifo;
+
+	web_t             * web;  /* WEB clients structure */
+
+	int uart[4];               /* file handles for the uarts */
+} gigargoyle_t;
+
+gigargoyle_t * ggg;
 
 uint32_t frame_duration;  /* us per frame, modified by
                            * PKT_TYPE_SET_FRAME_RATE or
                            * PKT_TYPE_SET_DURATION */
 
-int row[4];               /* file handles for the uarts */
-int * web;                /* file handle for web clients accept()ed */
 
 uint8_t tmp_screen8 [ACAB_Y][ACAB_X][3];
 uint8_t tmp_screen16[ACAB_X][ACAB_Y][6];

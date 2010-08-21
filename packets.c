@@ -24,6 +24,7 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "config.h"
 #include "packets.h"
@@ -50,10 +51,18 @@ int in_packet(pkt_t * p, uint32_t plen)
 
 	if (plen < p->pkt_len )
 	{
+#if 0 /* this is fine -1 is the marker for incomplete packets */
 		LOG("PKTS: WARNING: got short packet (%d < %d)\n",
-		    p->pkt_len, plen
-		);
+		    plen, p->pkt_len
+		   );
+#endif
 		return -1;
+	}
+
+	if (p->pkt_len > FIFO_WIDTH)
+	{
+		LOG("PKTS: WARNING: got long packet (len %d)\n", plen);
+		return -3;
 	}
 
 	switch(p->hdr & PKT_MASK_TYPE)
@@ -130,7 +139,7 @@ void set_pixel_xy_rgb8(
 		timestamp = gettimeofday64();
 	}
 
-	ret = write(row[y], bus_buf, 9);
+	ret = write(ggg->uart[y], bus_buf, 9);
 
 	if (ret != 9)
 		LOG("PKTS: WARNING: write(bus %d) = %d != 9\n", y, ret);
@@ -180,7 +189,13 @@ void set_screen_rgb8(uint32_t hdr, uint8_t s[ACAB_Y][ACAB_X][3])
 		}
                 /* LOG("\n"); */
 	}
-        /* LOG("\n\n"); */
+	if (hdr & PKT_MASK_REQ_ACK)
+		if (ggg->source == SOURCE_QM)
+			if (ggg->qm->state == NET_CONNECTED)
+			{
+				//LOG("PKTS: ACK\n");
+				write(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
+			}
 }
 
 void set_screen_rgb16(uint32_t hdr, uint16_t s[ACAB_Y][ACAB_X][3])
@@ -199,6 +214,10 @@ void set_screen_rgb16(uint32_t hdr, uint16_t s[ACAB_Y][ACAB_X][3])
 				    );
 		}
 	}
+	if (hdr & PKT_MASK_REQ_ACK)
+		if (ggg->source == SOURCE_QM)
+			if (ggg->qm->state == NET_CONNECTED)
+				write(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
 }
 
 void set_screen_rnd_bw(void)
@@ -244,13 +263,13 @@ void flip_double_buffer_on_bus(int b)
 	uint8_t bus_buf[9]; //FIXME
 	bus_buf[0] = 0x5c;
 	bus_buf[1] = 0x30;
-	bus_buf[2] = 0x10;
-	bus_buf[3] = 'C';
+	bus_buf[2] = 0x00;
+	bus_buf[3] = 'U';
 	bus_buf[7] = 0x5c;
 	bus_buf[8] = 0x31;
 	int ret;
 
-	ret = write(row[b], bus_buf, 9);
+	ret = write(ggg->uart[b], bus_buf, 9);
 	if (ret != 9)
 		LOG("PKTS: WARNING: flip_double_buffer_on_bus() write(bus %d) = %d != 9\n", b, ret);
 }
@@ -380,36 +399,36 @@ void serve_web_clients(void)
 
 	for (i=0; i<MAX_WEB_CLIENTS; i++)
 	{
-		if (web[i] != -1)
+		if (ggg->web->sock[i] != -1)
 		{
 			FD_ZERO(&rfd);
 			FD_ZERO(&wfd);
 			FD_ZERO(&efd);
 
-			FD_SET(web[i], &wfd);
-			FD_SET(web[i], &efd);
+			FD_SET(ggg->web->sock[i], &wfd);
+			FD_SET(ggg->web->sock[i], &efd);
 
-			select(web[i]+1, &rfd, &wfd, &efd, &tv);
+			select(ggg->web->sock[i]+1, &rfd, &wfd, &efd, &tv);
 
-			if (FD_ISSET(web[i], &efd))
+			if (FD_ISSET(ggg->web->sock[i], &efd))
 			{
-				close(web[i]);
-				web[i] = -1;
+				close(ggg->web->sock[i]);
+				ggg->web->sock[i] = -1;
 				LOG("WEB: wizard%d disagrees no more\n", i);
 			}
 
-			if (FD_ISSET(web[i], &wfd))
+			if (FD_ISSET(ggg->web->sock[i], &wfd))
 			{
-				ret = write(web[i], shadow_screen, ACAB_X*ACAB_Y*3);
+				ret = write(ggg->web->sock[i], shadow_screen, ACAB_X*ACAB_Y*3);
 				if (ret != ACAB_X*ACAB_Y*3)
 				{
 					LOG("PKTS: gigargoyle told wizard%d to move aside. she refused and is now dead.\n", i);
-					close(web[i]);
-					web[i] = -1;
+					close(ggg->web->sock[i]);
+					ggg->web->sock[i] = -1;
 				}
 			}else{
-				close(web[i]);
-				web[i] = -1;
+				close(ggg->web->sock[i]);
+				ggg->web->sock[i] = -1;
 				LOG("WEB: wizard%d got some special treatment\n", i);
 			}
 		}
