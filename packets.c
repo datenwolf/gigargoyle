@@ -187,6 +187,7 @@ void set_screen_rgb8(uint32_t hdr, uint8_t s[ACAB_Y][ACAB_X][3])
 					ix, iy
 				    );
 		}
+                /* LOG("\n"); */
 	}
 	if (hdr & PKT_MASK_REQ_ACK)
 		if (ggg->source == SOURCE_QM)
@@ -283,13 +284,13 @@ void flip_double_buffer(void)
 void next_frame(void)
 {
 	pkt_t * p;
+
 	/*
 	 * yeah, we use goto here! deal with it!
 	 * problem: we don't want to wait after processing a control packet,
 	 *          like setting framerate or duration
 	 */
 again:
-
 	p = rd_fifo();
 
 	if (p == NULL)
@@ -298,20 +299,29 @@ again:
 		return;
 	}
 
+        LOG("next frame type %x\n", p->hdr & PKT_MASK_TYPE);
+
 	switch(p->hdr & PKT_MASK_TYPE)
 	{
 		case PKT_TYPE_SET_FADE_RATE:
 		case PKT_TYPE_SET_PIXEL:
 		case PKT_TYPE_FLIP_DBL_BUF:
+                        break;
+
 		case PKT_TYPE_TEXT:
 		case PKT_TYPE_SET_FONT:
 		case PKT_TYPE_SET_SCREEN_BLK:
                         set_screen_blk();
                         break;
+
 		case PKT_TYPE_SET_SCREEN_WHT:
+                        set_screen_blk();
+                        break;
+
 		case PKT_TYPE_SET_SCREEN_RND_BW:
 			set_screen_rnd_bw();
 			break;
+
 		case PKT_TYPE_SET_SCREEN_RND_COL:
 			set_screen_rnd_col();
 			break;
@@ -355,6 +365,8 @@ again:
 				LOG("PKTS: WARNING: dropping short SET_DURATION pkt\n");
 				return;
 			}
+			frame_duration = 1000*ntohl(*((uint32_t *)(p->data)));
+                        LOG("PKRS: New duration %d\n", frame_duration);
 			frame_duration = ntohl(*((uint32_t *)p->data));
 			goto again;
 

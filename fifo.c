@@ -44,8 +44,8 @@ void wr_fifo(pkt_t * pkt)
 	pkt_t *p = (pkt_t *)ggg->fifo->fifo[ggg->fifo->wr];
 
 	memcpy(p, pkt, sizeof(pkt_t));
-	p->data = (uint8_t *)(p + 1);
-	memcpy(p + 1, pkt->data, pkt->pkt_len - 8);
+        p->data = (uint8_t *)(p + 1);
+        memcpy(p + 1, pkt->data, pkt->pkt_len - 8);
 
 	ggg->fifo->wr++;
 	ggg->fifo->wr %= FIFO_DEPTH;
@@ -77,8 +77,9 @@ pkt_t * rd_fifo(void)
 
 	pkt_t * p = (pkt_t *) ggg->fifo->fifo[ggg->fifo->rd];
 	memcpy(ggg->fifo->packet, ggg->fifo->fifo[ggg->fifo->rd], sizeof(pkt_t) + p->pkt_len - 8);
-
-	ggg->fifo->rd++;
+        ggg->fifo->packet->data = (uint8_t *)(ggg->fifo->packet->data + 1);
+	
+        ggg->fifo->rd++;
 	ggg->fifo->rd %= FIFO_DEPTH;
 	if (ggg->fifo->wr == ggg->fifo->rd)
 		ggg->fifo->state = FIFO_EMPTY;

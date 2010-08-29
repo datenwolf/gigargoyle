@@ -44,7 +44,7 @@
 
 #define MAX_WEB_CLIENTS 24
 
-#define STARTUP_FRAME_DURATION 10000 /* in us */
+#define STARTUP_FRAME_DURATION 1.0f/5*1e6 /* in us */
 #define MIN_GAP_BUS_TRANSFERS   1000 /* in us */
 
 #define MISSING_PKTS_TO_LOCAL 235 /* how many "missing" packets

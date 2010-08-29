@@ -150,12 +150,17 @@ uint8_t *serialize_packet(pkt_t *p) {
 
 void gg_set_duration(gg_socket *s, unsigned int duration) {
   pkt_t *p;
+  uint32_t ndur;
 
   p = create_packet(VERSION,
                     PKT_MASK_RGB8,
                     PKT_TYPE_SET_DURATION,
                     0, 0, 0);
   
+  ndur = htonl(duration);
+  p->data = (uint8_t *)malloc(sizeof(uint32_t));
+  memcpy(p->data, &ndur, sizeof(uint32_t));
+
   send_packet(s, p);
 
   free(p->data);

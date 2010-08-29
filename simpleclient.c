@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <math.h>
 
 #include "gg_simple_client.h"
 
@@ -17,23 +18,20 @@ int main(int argc, char *argv[]) {
   s = gg_init_socket("localhost", 0xabac);
 
   /* 30 fps */
-  /* gg_set_duration(s, FRAME_DURATION); */
+  gg_set_duration(s, FRAME_DURATION);
 
-  for (i = 0; i < 1000; ++i) {
-
+  for (i = 0; i < 2000; ++i) {
     for (col = 0; col < COLS; ++col) {
       for (row = 0; row < ROWS; ++row) {
         gg_set_pixel_color(f, col, row,
-                           row*10, col*4, 0);
+                           (uint8_t)(127*(sin(i/10.0)+1)),
+                           (uint8_t)(127*(sin(i/10.1)+1)),
+                           (uint8_t)(127*(sin(i/10.2)+1)));
       }
     }
 
-    gg_send_command(s, PKT_TYPE_SET_SCREEN_WHT);
-
     printf("Sent frame %d\n", i);
-    /* gg_send_frame(s, f); */
-
-    /* usleep(FRAME_DURATION-100); */
+    gg_send_frame(s, f);
   }
 
   gg_deinit_frame(f);
