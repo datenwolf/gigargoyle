@@ -128,16 +128,22 @@ void close_ss(streamingsource_t *ss)
 				ss->type,
 				strerror(errno));
 	}
-	init_ss_l_socket(ss, arguments.port_qm);	// FIXME
+
+	// FIXME: beautify
+	init_ss_l_socket(ss, ss->type == SOURCE_QM ?
+			arguments.port_qm : arguments.port_is);
 	ss->state = NET_NOT_CONNECTED;
-	if (ggg->source == SOURCE_QM && ss->type == SOURCE_QM)
+	if ((ggg->source == SOURCE_QM && ss->type == SOURCE_QM) ||
+		(ggg->source == SOURCE_IS && ggg->qm->state == NET_NOT_CONNECTED))
 	{
 		ggg->source = SOURCE_LOCAL;
 		ggg->ss = NULL;
 	}
-	else if (ggg->source == SOURCE_IS && ss->type == SOURCE_QM)
+	else if (ggg->source == SOURCE_IS && ss->type == SOURCE_IS &&
+			ggg->qm->state == NET_CONNECTED)
 	{
-		/* Nothing to do */
+		ggg->source = SOURCE_QM;
+		ggg->ss = ggg->qm;
 	}
 	else
 	{
@@ -220,11 +226,18 @@ void process_ss_data(streamingsource_t *ss)
 		ret_pkt = check_packet(&p, plen);
 
 		if(ret_pkt == -1) {
+			/* too short */
 			ss->input_offset += plen;
 		} else {
-			if(ret_pkt == 0 && (ggg->source != SOURCE_IS ||
-					    ss->type == SOURCE_IS))
-				early_handle_packet(&p);
+			if(ret_pkt == 0) {
+				if (ggg->source == SOURCE_QM) {
+					/* queue packet */
+					early_handle_packet(&p);
+				} else if (ggg->source == SOURCE_IS) {
+					/* process packet right now */
+					handle_packet(&p);
+				}
+			}
 
 			if( ((int)p.pkt_len <= plen) &&
 			    ((int)p.pkt_len > 0)     &&
@@ -825,7 +838,8 @@ void mainloop(void)
 		    (frame_last_time == 0))
 		{
 			frame_last_time = tmp64;
-			next_frame();
+			if(ggg->source != SOURCE_IS)
+				next_frame();
 			frame_remaining = frame_duration;
 		} else {
 			frame_remaining = frame_last_time + frame_duration - tmp64;
