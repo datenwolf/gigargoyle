@@ -201,12 +201,6 @@ void process_qm_data(void)
 	pt = (pkt_t *) ggg->qm->buf;
 
 	int plen = ret + ggg->qm->input_offset;
-	if ((plen > BUF_SZ) || (plen <= 0))
-	{ /* reset input buffer */
-		LOG("QM: input reset %d\n", plen);
-		ggg->qm->input_offset = 0;
-		return;
-	}
 	int ret_pkt;
         do {
 		p.hdr = ntohl(pt->hdr);
@@ -227,16 +221,7 @@ void process_qm_data(void)
 			if( ((int)p.pkt_len <= plen) &&
 			    ((int)p.pkt_len > 0)     &&
 			    ((int)p.pkt_len < FIFO_WIDTH)) {
-
 				plen -= (int)p.pkt_len;
-
-				if ((plen > BUF_SZ) || (plen <= 0))
-				{ /* reset input buffer */
-					LOG("QM: input reset %d\n", plen);
-					ggg->qm->input_offset = 0;
-					return;
-				}
-
 				memmove(ggg->qm->buf, ggg->qm->buf + p.pkt_len, plen);
 			}
 			ggg->qm->input_offset = 0;
