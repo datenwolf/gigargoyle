@@ -201,9 +201,9 @@ void set_screen_rgb8(uint32_t hdr, uint8_t s[ACAB_Y][ACAB_X][3])
 {
 	int ix, iy;
 
-	for (iy=0; iy < ACAB_Y; iy++)
+	for (ix=0; ix < ACAB_X; ix++)
 	{
-		for (ix=0; ix < ACAB_X; ix++)
+		for (iy=0; iy < ACAB_Y; iy++)
 		{
 			/* LOG("%x %x %x, ", s[ix][iy][0], s[ix][iy][1], s[ix][iy][2]); */
 			set_pixel_xy_rgb8(
@@ -215,21 +215,21 @@ void set_screen_rgb8(uint32_t hdr, uint8_t s[ACAB_Y][ACAB_X][3])
 				    );
 		}
 	}
-	if (hdr & PKT_MASK_REQ_ACK)
-		if (ggg->source == SOURCE_QM)
-			if (ggg->qm->state == NET_CONNECTED)
-			{
-				//LOG("PKTS: ACK\n");
-				write_all(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
-			}
+
+	if (hdr & PKT_MASK_REQ_ACK && ggg->source == SOURCE_QM &&
+			ggg->qm->state == NET_CONNECTED)
+	{
+		//LOG("PKTS: ACK\n");
+		write_all(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
+	}
 }
 
 void set_screen_rgb16(uint32_t hdr, uint16_t s[ACAB_Y][ACAB_X][3])
 {
 	int ix, iy;
-	for (iy=0; iy < ACAB_Y; iy++)
+	for (ix=0; ix < ACAB_X; ix++)
 	{
-		for (ix=0; ix < ACAB_X; ix++)
+		for (iy=0; iy < ACAB_Y; iy++)
 		{
 			set_pixel_xy_rgb16(
 			                hdr,
@@ -240,10 +240,10 @@ void set_screen_rgb16(uint32_t hdr, uint16_t s[ACAB_Y][ACAB_X][3])
 				    );
 		}
 	}
-	if (hdr & PKT_MASK_REQ_ACK)
-		if (ggg->source == SOURCE_QM)
-			if (ggg->qm->state == NET_CONNECTED)
-				write_all(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
+
+	if (hdr & PKT_MASK_REQ_ACK && ggg->source == SOURCE_QM &&
+                    ggg->qm->state == NET_CONNECTED)
+		write_all(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
 }
 
 void set_screen_rnd_bw(void)
