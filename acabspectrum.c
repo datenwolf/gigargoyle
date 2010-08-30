@@ -13,8 +13,8 @@
 
 #define COLS 24
 #define ROWS 4
-#define FRAME_DURATION 1.0f/1000*1e3
 #define LP_LEN 5
+#define BUFSIZE 1024
 
 jack_port_t *input_port;
 jack_client_t *client;
@@ -78,6 +78,7 @@ fftw_plan p;
 
 /* Called by jack when new data ist available */
 int process (jack_nframes_t nframes, void *arg) {
+  static uint8_t cnt = 0;
   jack_default_audio_sample_t *in, *out;
 
   int i;
@@ -157,7 +158,10 @@ int process (jack_nframes_t nframes, void *arg) {
   }
 
   /* Finally we can send our frame */
-  gg_send_frame((gg_socket *)arg, frame);
+  if (++cnt % 4 == 0) {
+    gg_send_frame((gg_socket *)arg, frame);
+  }
+
   printf("\n");
 
   return 0;      
@@ -181,7 +185,6 @@ int main(int argc, char *argv[]) {
   /* Open connection to gigargoyle */
   frame = gg_init_frame(COLS, ROWS, 3);
   gg_socket = gg_init_socket("localhost", 0xabac);
-  gg_set_duration(gg_socket, FRAME_DURATION);
 
   /* open a client connection to the JACK server */
   client = jack_client_open (client_name, options, &status, server_name);
@@ -201,6 +204,8 @@ int main(int argc, char *argv[]) {
     fprintf (stderr, "unique name `%s' assigned\n", client_name);
   }
 
+  gg_set_duration(gg_socket, ((double)BUFSIZE)/jack_get_sample_rate(client)*1000.0);
+
   jack_set_process_callback (client, process, gg_socket);
   jack_on_shutdown (client, jack_shutdown, 0);
 
@@ -215,10 +220,10 @@ int main(int argc, char *argv[]) {
   }
 
   /* FFTW */
-  in_cplx = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * 1024);
-  out_cplx = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * 1024);
+  in_cplx = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * BUFSIZE);
+  out_cplx = (fftw_complex*) fftw_malloc(sizeof(fftw_complex) * BUFSIZE);
 
-  p = fftw_plan_dft_1d(1024, in_cplx, out_cplx, FFTW_FORWARD, FFTW_ESTIMATE);
+  p = fftw_plan_dft_1d(BUFSIZE, in_cplx, out_cplx, FFTW_FORWARD, FFTW_ESTIMATE);
 
   /* Tell the JACK server that we are ready to roll.  Our
    * process() callback will start running now. */
