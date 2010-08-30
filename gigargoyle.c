@@ -28,7 +28,6 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/time.h>
@@ -46,33 +45,6 @@ uint32_t frame_remaining;
 uint64_t frame_last_time = 0;
 
 #define BUF_SZ 4096
-
-/* Contains parsed command line arguments */
-extern struct arguments arguments;
-
-char doc[] = "Control a moodlamp matrix using a TCP socket";
-char args_doc[] = "";
-
-/* Accepted option */
-struct argp_option options[] = {
-        {"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
-        {"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
-        {"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
-        {"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
-        {"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
-        {"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
-        {"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
-        {"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
-        {"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
-        {"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
-        {"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
-        {"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
-        {"logfile", 'l', "LOGFILE", 0, "Path to log file"},
-        {0}
-};
-
-/* Argument parser */
-struct argp argp = {options, parse_opt, args_doc, doc};
 
 /* prototypes we need */
 void init_qm_l_socket(void);
@@ -124,6 +96,30 @@ void process_web_l_data(void)
 /* Contains parsed command line arguments */
 extern struct arguments arguments;
 
+char doc[] = "Control a moodlamp matrix using a TCP socket";
+char args_doc[] = "";
+
+/* Accepted option */
+struct argp_option options[] = {
+	{"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
+	{"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
+	{"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
+	{"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
+	{"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
+	{"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
+	{"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
+	{"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
+	{"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
+	{"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
+	{"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
+	{"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
+	{"logfile", 'l', "LOGFILE", 0, "Path to log file"},
+	{0}
+};
+
+/* Argument parser */
+struct argp argp = {options, parse_opt, args_doc, doc};
+
 void close_qm(void)
 {
 	int ret;
@@ -158,7 +154,6 @@ void process_qm_l_data(void)
 				strerror(errno));
 		exit(1);
 	}
-
 	ggg->qm->sock = ret;
 	ggg->qm->state = NET_CONNECTED;
 	if (ggg->source != SOURCE_IS)
@@ -174,7 +169,6 @@ void process_qm_l_data(void)
 			(ca.sin_addr.s_addr & 0xff000000) >> 24,
 			ntohs(ca.sin_port)
 	   );
-
 	ret = close(ggg->qm->listener);
 	if (ret)
 	{
@@ -215,9 +209,9 @@ void process_qm_data(void)
 	}
 	int ret_pkt;
         do {
-                p.hdr = ntohl(pt->hdr);
-                p.pkt_len = ntohl(pt->pkt_len);
-	        p.data = (uint8_t *) &(pt->data);
+		p.hdr = ntohl(pt->hdr);
+		p.pkt_len = ntohl(pt->pkt_len);
+		p.data = (uint8_t *) &(pt->data);
 
 		if (p.pkt_len < 8)
 		{
@@ -328,11 +322,8 @@ void daemonize(void)
 	int pidfile = open(arguments.pid_file, 
 	                   O_WRONLY | O_CREAT | O_TRUNC,
 	                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	if (pidfile < 0) {
-		printf("ERROR: open(%s): %s\n", arguments.pid_file, strerror(errno));
+	if (pidfile < 0)
 		exit(1);
-	}
-
 	char buf[BUF_SZ];
 	snprintf(buf, 6, "%d", ggg->daemon_pid);
 	ret = write(pidfile, buf, strlen(buf));
@@ -466,7 +457,6 @@ void init_web_l_socket(void)
 {
 	int ret;
 	struct sockaddr_in sa;
-        int on = 1;
 
 	ggg->web = malloc(sizeof(*ggg->web));
 	if (!ggg->web)
@@ -737,7 +727,7 @@ void mainloop(void)
 		{
 			LOG("ERROR: select(): %s\n",
 					strerror(errno));
-			//exit(1);
+			exit(1);
 		}
 
 		for (i=0; i<4; i++)
@@ -870,7 +860,6 @@ void mainloop(void)
 		if ((frame_duration + frame_last_time <= tmp64 ) ||
 		    (frame_last_time == 0))
 		{
-                  /* LOG("Frame timing error: %f%%\n", 100*(1-(double)frame_duration/(frame_remaining+frame_duration))); */
 			frame_last_time = tmp64;
 			next_frame();
 			frame_remaining = frame_duration;
@@ -889,7 +878,9 @@ void gigargoyle_shutdown(void)
 int main(int argc, char ** argv)
 {
 	init_arguments(&arguments);
+#ifdef HAS_ARGP_PARSE
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
+#endif
 
 	init();
 
