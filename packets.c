@@ -360,7 +360,11 @@ void handle_packet(pkt_t * p) {
 					LOG(" %d != %d\n", p->pkt_len, 8 + 3 * ACAB_X * ACAB_Y);
 					return;
 				}
+				uint64_t start, end;
+				start = gettimeofday64();
 				set_screen_rgb8(p->hdr, (uint8_t (*)[ACAB_X][3])p->data);
+				end = gettimeofday64();
+				LOG("PROF: set_screen = %lu\n", end - start);
 			}
 
 			break;
