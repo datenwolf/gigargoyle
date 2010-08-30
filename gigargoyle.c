@@ -213,7 +213,7 @@ void process_qm_data(void)
 			ggg->qm->input_offset += plen;
 		} else {
 			if(ret_pkt == 0)
-				handle_packet(&p);
+				early_handle_packet(&p);
 
 			if( ((int)p.pkt_len <= plen) &&
 			    ((int)p.pkt_len > 0)     &&
@@ -845,7 +845,7 @@ void mainloop(void)
 			frame_last_time = tmp64;
 			next_frame();
 			frame_remaining = frame_duration;
-		}else{
+		} else {
 			frame_remaining = frame_last_time + frame_duration - tmp64;
 		}
 	}

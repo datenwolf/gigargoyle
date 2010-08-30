@@ -81,8 +81,9 @@ typedef struct pkt_s {
 
 /* prototypes from packets.c */
 int check_packet(pkt_t * p, uint32_t plen);
-void handle_packet(pkt_t * p);
+void early_handle_packet(pkt_t * p);
 void next_frame(void);
+void handle_packet(pkt_t * p);
 void serve_web_clients(void);
 
 uint8_t shadow_screen[ACAB_Y][ACAB_X][3]; /* for web clients */

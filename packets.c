@@ -92,7 +92,8 @@ int check_packet(pkt_t * p, uint32_t plen)
 	return 0;
 }
 
-void handle_packet(pkt_t * p) {
+/* handle packets after being received by socket */
+void early_handle_packet(pkt_t * p) {
 	switch(p->hdr & PKT_MASK_TYPE)
 	{
 		case PKT_TYPE_SET_SCREEN_BLK:
@@ -309,13 +310,6 @@ void flip_double_buffer(void)
 void next_frame(void)
 {
 	pkt_t * p;
-	/*
-	 * yeah, we use goto here! deal with it!
-	 * problem: we don't want to wait after processing a control packet,
-	 *          like setting framerate or duration
-	 */
-again:
-
 	p = rd_fifo();
 
 	if (p == NULL)
@@ -324,6 +318,11 @@ again:
 		return;
 	}
 
+	handle_packet(p);
+}
+
+
+void handle_packet(pkt_t * p) {
 	switch(p->hdr & PKT_MASK_TYPE)
 	{
 		case PKT_TYPE_SET_FADE_RATE:
@@ -373,7 +372,8 @@ again:
 				return;
 			}
 			frame_duration = 1000000 / (*((uint32_t *)p->data));
-			goto again;
+			next_frame();
+			return;
 
 		case PKT_TYPE_SET_DURATION:
 			if (p->pkt_len != 12)
@@ -383,7 +383,8 @@ again:
 			}
 			frame_duration = ntohl(*((uint32_t *)p->data));
                         LOG("PKTS: New duration %u\n", frame_duration);
-			goto again;
+			next_frame();
+			return;
 
 		/* out-of-band immediate commands follow */
 		/* but were handled already async when entering gigargoyle, see in_packet() */
