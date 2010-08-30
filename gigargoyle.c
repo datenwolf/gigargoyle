@@ -207,17 +207,14 @@ void process_qm_data(void)
 		p.pkt_len = ntohl(pt->pkt_len);
 		p.data = (uint8_t *) &(pt->data);
 
-		if (p.pkt_len < 8)
-		{
-			LOG("QM: short packet tells me its %d bytes long\n", p.pkt_len);
-			return;
-		}
-
-		ret_pkt = in_packet(&p, plen);
+		ret_pkt = check_packet(&p, plen);
 
 		if(ret_pkt == -1) {
 			ggg->qm->input_offset += plen;
 		} else {
+			if(ret_pkt == 0)
+				handle_packet(&p);
+
 			if( ((int)p.pkt_len <= plen) &&
 			    ((int)p.pkt_len > 0)     &&
 			    ((int)p.pkt_len < FIFO_WIDTH)) {
@@ -538,7 +535,7 @@ void init(void)
 	ggg = malloc(sizeof(*ggg));
 	if (!ggg)
 	{
-		printf("ERROR: couldn't alloc %d bytes: %s\n",
+		printf("ERROR: couldn't alloc %lu bytes: %s\n",
 		       sizeof(*ggg),
 		       strerror(errno));
 		exit(1);
@@ -550,7 +547,7 @@ void init(void)
 	ggg->qm = malloc(sizeof(*ggg->qm));
 	if (!ggg->qm)
 	{
-		printf("ERROR: couldn't alloc %d bytes: %s\n",
+		printf("ERROR: couldn't alloc %lu bytes: %s\n",
 		       sizeof(*ggg->qm),
 		       strerror(errno));
 		exit(1);
@@ -562,7 +559,7 @@ void init(void)
 	ggg->is = malloc(sizeof(*ggg->is));
 	if (!ggg->is)
 	{
-		printf("ERROR: couldn't alloc %d bytes: %s\n",
+		printf("ERROR: couldn't alloc %lu bytes: %s\n",
 		       sizeof(*ggg->is),
 		       strerror(errno));
 		exit(1);

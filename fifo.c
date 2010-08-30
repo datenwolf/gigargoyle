@@ -78,7 +78,7 @@ pkt_t * rd_fifo(void)
         ggg->fifo->running_empty_on_network = 0;
 
 	pkt_t * p = (pkt_t *) ggg->fifo->fifo[ggg->fifo->rd];
-	memcpy(ggg->fifo->packet, ggg->fifo->fifo[ggg->fifo->rd], sizeof(pkt_t) + p->pkt_len - 8);
+	memcpy(ggg->fifo->packet, p, sizeof(pkt_t) + p->pkt_len - 8);
 
 	ggg->fifo->rd++;
 	ggg->fifo->rd %= FIFO_DEPTH;
