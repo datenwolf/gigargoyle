@@ -31,6 +31,7 @@ FILE * logfp;
 
 typedef struct streamingsource_s
 {
+	uint8_t   type;
 	int       listener;       /* file handle for the QM or IS listen()   */
 	int       sock;           /* file handle for the QM or IS accept()ed */
 	int       state;

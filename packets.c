@@ -35,8 +35,32 @@
 /* Contains parsed command line arguments */
 extern struct arguments arguments;
 
-int in_packet(pkt_t * p, uint32_t plen)
+void write_all(int fd, char *str, int cnt)
 {
+	int res;
+	int towrite = cnt;
+
+	while (towrite > 0 && (res = write(fd, str, cnt)) != towrite) {
+		if (res < 0 && errno == EINTR)
+			continue;
+		if (res < 0) {
+			/* FIXME: Error, handle it! */
+			break;
+		}
+
+		towrite -= res;
+		str += res;
+	}
+}
+
+int check_packet(pkt_t * p, uint32_t plen)
+{
+	if (p->pkt_len < 8)
+	{
+		LOG("QM: short packet tells me its %d bytes long\n", p->pkt_len);
+		return -2;
+	}
+
 	if (plen < 8)
 	{
 		LOG("PKTS: WARNING: got very short packet (len %d)\n", plen);
@@ -65,6 +89,11 @@ int in_packet(pkt_t * p, uint32_t plen)
 		return -3;
 	}
 
+	return 0;
+}
+
+/* handle packets after being received by socket */
+void early_handle_packet(pkt_t * p) {
 	switch(p->hdr & PKT_MASK_TYPE)
 	{
 		case PKT_TYPE_SET_SCREEN_BLK:
@@ -89,10 +118,8 @@ int in_packet(pkt_t * p, uint32_t plen)
 			gigargoyle_shutdown(); /* FIXME only from QM, not from IS */
 			break;
 		default:
-			return 0; /* drop unsupported packages */
+			break; /* drop unsupported packages */
 	}
-        
-        return 0;
 }
 
 void set_pixel_xy_rgb8(
@@ -187,14 +214,13 @@ void set_screen_rgb8(uint32_t hdr, uint8_t s[ACAB_Y][ACAB_X][3])
 					ix, iy
 				    );
 		}
-                /* LOG("\n"); */
 	}
 	if (hdr & PKT_MASK_REQ_ACK)
 		if (ggg->source == SOURCE_QM)
 			if (ggg->qm->state == NET_CONNECTED)
 			{
 				//LOG("PKTS: ACK\n");
-				write(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
+				write_all(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
 			}
 }
 
@@ -217,7 +243,7 @@ void set_screen_rgb16(uint32_t hdr, uint16_t s[ACAB_Y][ACAB_X][3])
 	if (hdr & PKT_MASK_REQ_ACK)
 		if (ggg->source == SOURCE_QM)
 			if (ggg->qm->state == NET_CONNECTED)
-				write(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
+				write_all(ggg->qm->sock, ACK_AB_KLINGON, strlen(ACK_AB_KLINGON));
 }
 
 void set_screen_rnd_bw(void)
@@ -284,13 +310,6 @@ void flip_double_buffer(void)
 void next_frame(void)
 {
 	pkt_t * p;
-
-	/*
-	 * yeah, we use goto here! deal with it!
-	 * problem: we don't want to wait after processing a control packet,
-	 *          like setting framerate or duration
-	 */
-again:
 	p = rd_fifo();
 
 	if (p == NULL)
@@ -299,29 +318,25 @@ again:
 		return;
 	}
 
-        LOG("next frame type %x\n", p->hdr & PKT_MASK_TYPE);
+	handle_packet(p);
+}
 
+
+void handle_packet(pkt_t * p) {
 	switch(p->hdr & PKT_MASK_TYPE)
 	{
 		case PKT_TYPE_SET_FADE_RATE:
 		case PKT_TYPE_SET_PIXEL:
 		case PKT_TYPE_FLIP_DBL_BUF:
-                        break;
-
 		case PKT_TYPE_TEXT:
 		case PKT_TYPE_SET_FONT:
 		case PKT_TYPE_SET_SCREEN_BLK:
                         set_screen_blk();
                         break;
-
 		case PKT_TYPE_SET_SCREEN_WHT:
-                        set_screen_blk();
-                        break;
-
 		case PKT_TYPE_SET_SCREEN_RND_BW:
 			set_screen_rnd_bw();
 			break;
-
 		case PKT_TYPE_SET_SCREEN_RND_COL:
 			set_screen_rnd_col();
 			break;
@@ -357,7 +372,8 @@ again:
 				return;
 			}
 			frame_duration = 1000000 / (*((uint32_t *)p->data));
-			goto again;
+			next_frame();
+			return;
 
 		case PKT_TYPE_SET_DURATION:
 			if (p->pkt_len != 12)
@@ -365,10 +381,10 @@ again:
 				LOG("PKTS: WARNING: dropping short SET_DURATION pkt\n");
 				return;
 			}
-			frame_duration = 1000*ntohl(*((uint32_t *)(p->data)));
-                        LOG("PKRS: New duration %d\n", frame_duration);
 			frame_duration = ntohl(*((uint32_t *)p->data));
-			goto again;
+                        LOG("PKTS: New duration %u\n", frame_duration);
+			next_frame();
+			return;
 
 		/* out-of-band immediate commands follow */
 		/* but were handled already async when entering gigargoyle, see in_packet() */

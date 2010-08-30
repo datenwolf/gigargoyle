@@ -28,7 +28,6 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/time.h>
@@ -47,41 +46,12 @@ uint64_t frame_last_time = 0;
 
 #define BUF_SZ 4096
 
-/* Contains parsed command line arguments */
-extern struct arguments arguments;
-
-char doc[] = "Control a moodlamp matrix using a TCP socket";
-char args_doc[] = "";
-
-/* Accepted option */
-struct argp_option options[] = {
-        {"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
-        {"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
-        {"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
-        {"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
-        {"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
-        {"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
-        {"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
-        {"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
-        {"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
-        {"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
-        {"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
-        {"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
-        {"logfile", 'l', "LOGFILE", 0, "Path to log file"},
-        {0}
-};
-
-/* Argument parser */
-struct argp argp = {options, parse_opt, args_doc, doc};
-
 /* prototypes we need */
-void init_qm_l_socket(void);
+void init_ss_l_socket(streamingsource_t *ss, uint16_t port);
 
 /* processors of input data from various sources */
 
 void process_row_data(int i) {/* LOG("row_data()\n"); */}
-void process_is_l_data(void) {LOG("is_l_data()\n");}
-void process_is_data(void)   {LOG("is_data()\n");}
 
 void process_web_l_data(void)
 {
@@ -124,128 +94,158 @@ void process_web_l_data(void)
 /* Contains parsed command line arguments */
 extern struct arguments arguments;
 
-void close_qm(void)
+char doc[] = "Control a moodlamp matrix using a TCP socket";
+char args_doc[] = "";
+
+/* Accepted option */
+struct argp_option options[] = {
+	{"pretend", 'p', NULL, 0, "Only pretend to send data to ttys but instead just log sent data"},
+	{"foreground", 'f', NULL, 0, "Stay in foreground; don't daemonize"},
+	{"port-qm", 'q', "PORT_QM", 0, "Listening port for the acabspool"},
+	{"port-is", 'i', "PORT_IS", 0, "Listening port for instant streaming clients"},
+	{"port-web", 'w', "PORT_WEB", 0, "Listening port for web clients"},
+	{"acab-x", 'x', "WIDTH", 0, "Width of matrix in pixels"},
+	{"acab-y", 'y', "HEIGHT", 0, "Height of matrix in pixels"},
+	{"uart-0", 127+1, "UART_0", 0, "Path to uart-0"},
+	{"uart-1", 127+2, "UART_1", 0, "Path to uart-1"},
+	{"uart-2", 127+3, "UART_2", 0, "Path to uart-2"},
+	{"uart-3", 127+4, "UART_3", 0, "Path to uart-3"},
+	{"pidfile", 127+5, "PIDFILE", 0, "Path to pid file"},
+	{"logfile", 'l', "LOGFILE", 0, "Path to log file"},
+	{0}
+};
+
+/* Argument parser */
+struct argp argp = {options, parse_opt, args_doc, doc};
+
+void close_ss(streamingsource_t *ss)
 {
 	int ret;
-	ret = close(ggg->qm->sock);
+	ret = close(ss->sock);
 	if(ret)
 	{
-		LOG("ERROR: close(qm): %s\n",
+		LOG("ERROR: close(ss%d): %s\n",
+				ss->type,
 				strerror(errno));
 	}
-	init_qm_l_socket();
-	ggg->qm->state = NET_NOT_CONNECTED;
-	if (ggg->source == SOURCE_QM)
+
+	// FIXME: beautify
+	init_ss_l_socket(ss, ss->type == SOURCE_QM ?
+			arguments.port_qm : arguments.port_is);
+	ss->state = NET_NOT_CONNECTED;
+	if ((ggg->source == SOURCE_QM && ss->type == SOURCE_QM) ||
+		(ggg->source == SOURCE_IS && ggg->qm->state == NET_NOT_CONNECTED))
 	{
 		ggg->source = SOURCE_LOCAL;
 		ggg->ss = NULL;
 	}
-	LOG("MAIN: listening for new QM connections\n");
-	ggg->qm->input_offset = 0;
+	else if (ggg->source == SOURCE_IS && ss->type == SOURCE_IS &&
+			ggg->qm->state == NET_CONNECTED)
+	{
+		ggg->source = SOURCE_QM;
+		ggg->ss = ggg->qm;
+	}
+	else
+	{
+		LOG("SS: Unhandled condition while closing SS%d (source SS%d)\n",
+			ss->type, ggg->source);
+	}
+
+	LOG("MAIN: listening for new SS%d connections\n", ss->type);
+	ss->input_offset = 0;
 }
 
-void process_qm_l_data(void)
+void process_ss_l_data(streamingsource_t *ss)
 {
-
 	int ret;
 	struct sockaddr_in ca;
 	socklen_t salen = sizeof(struct sockaddr);
 
-	ret = accept(ggg->qm->listener, (struct sockaddr *)&ca, &salen);
+	ret = accept(ss->listener, (struct sockaddr *)&ca, &salen);
 	if (ret < 0)
 	{
-		LOG("ERROR: accept() in  process_qm_l_data(): %s\n",
+		LOG("ERROR: accept() in  process_ss_l_data(): %s\n",
 				strerror(errno));
 		exit(1);
 	}
+	ss->sock = ret;
+	ss->state = NET_CONNECTED;
 
-	ggg->qm->sock = ret;
-	ggg->qm->state = NET_CONNECTED;
 	if (ggg->source != SOURCE_IS)
 	{
-		ggg->source = SOURCE_QM;
-		ggg->ss = ggg->qm;
+		ggg->source = ss->type;
+		ggg->ss = ss;
 		flush_fifo();
 	}
-	LOG("MAIN: queuing manager connected from %d.%d.%d.%d:%d\n",
+
+	LOG("MAIN: streaming source connected from %d.%d.%d.%d:%d\n",
 			(ca.sin_addr.s_addr & 0x000000ff) >>  0,
 			(ca.sin_addr.s_addr & 0x0000ff00) >>  8,
 			(ca.sin_addr.s_addr & 0x00ff0000) >> 16,
 			(ca.sin_addr.s_addr & 0xff000000) >> 24,
 			ntohs(ca.sin_port)
-	   );
+	);
 
-	ret = close(ggg->qm->listener);
-	if (ret)
+	if (close(ss->listener) < 0)
 	{
-		LOG("ERROR: close(qm->listener): %s\n", strerror(errno));
+		LOG("ERROR: close(ss->listener): %s\n", strerror(errno));
 	}
 }
 
-void process_qm_data(void)
+void process_ss_data(streamingsource_t *ss)
 {
 	pkt_t p;
 	pkt_t *pt;
 	int ret;
 
-	ret = read(ggg->qm->sock, ggg->qm->buf + ggg->qm->input_offset, BUF_SZ - ggg->qm->input_offset);
+	ret = read(ss->sock, ss->buf + ss->input_offset, BUF_SZ - ss->input_offset);
 	if (ret == 0)
 	{
-		LOG("QM closed connection\n");
-		close_qm();
+		LOG("SS%d closed connection\n", ss->type);
+		close_ss(ss);
 		return;
 	}
 	if (ret < 0)
 	{
-		LOG("QM: WARNING: read() from queing manager: %s\n",
+		LOG("SS: WARNING: read(): %s\n",
 		    strerror(errno));
-		LOG("QM:          closing QM connection\n");
-		close_qm();
+		LOG("SS:          closing SS%d connection\n", ss->type);
+		close_ss(ss);
 		return;
 	}
 
-	pt = (pkt_t *) ggg->qm->buf;
+	pt = (pkt_t *) ss->buf;
 
-	int plen = ret + ggg->qm->input_offset;
-	if ((plen > BUF_SZ) || (plen <= 0))
-	{ /* reset input buffer */
-		LOG("QM: input reset %d\n", plen);
-		ggg->qm->input_offset = 0;
-		return;
-	}
+	int plen = ret + ss->input_offset;
 	int ret_pkt;
         do {
-                p.hdr = ntohl(pt->hdr);
-                p.pkt_len = ntohl(pt->pkt_len);
-	        p.data = (uint8_t *) &(pt->data);
+		p.hdr = ntohl(pt->hdr);
+		p.pkt_len = ntohl(pt->pkt_len);
+		p.data = (uint8_t *) &(pt->data);
 
-		if (p.pkt_len < 8)
-		{
-			LOG("QM: short packet tells me its %d bytes long\n", p.pkt_len);
-			return;
-		}
-
-		ret_pkt = in_packet(&p, plen);
+		ret_pkt = check_packet(&p, plen);
 
 		if(ret_pkt == -1) {
-			ggg->qm->input_offset += plen;
+			/* too short */
+			ss->input_offset += plen;
 		} else {
+			if(ret_pkt == 0) {
+				if (ggg->source == SOURCE_QM) {
+					/* queue packet */
+					early_handle_packet(&p);
+				} else if (ggg->source == SOURCE_IS) {
+					/* process packet right now */
+					handle_packet(&p);
+				}
+			}
+
 			if( ((int)p.pkt_len <= plen) &&
 			    ((int)p.pkt_len > 0)     &&
 			    ((int)p.pkt_len < FIFO_WIDTH)) {
-
 				plen -= (int)p.pkt_len;
-
-				if ((plen > BUF_SZ) || (plen <= 0))
-				{ /* reset input buffer */
-					LOG("QM: input reset %d\n", plen);
-					ggg->qm->input_offset = 0;
-					return;
-				}
-
-				memmove(ggg->qm->buf, ggg->qm->buf + p.pkt_len, plen);
+				memmove(ss->buf, ss->buf + p.pkt_len, plen);
 			}
-			ggg->qm->input_offset = 0;
+			ss->input_offset = 0;
 		}
 	} while(ret_pkt == 0 && plen != 0);
 }
@@ -328,11 +328,8 @@ void daemonize(void)
 	int pidfile = open(arguments.pid_file, 
 	                   O_WRONLY | O_CREAT | O_TRUNC,
 	                   S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-	if (pidfile < 0) {
-		printf("ERROR: open(%s): %s\n", arguments.pid_file, strerror(errno));
+	if (pidfile < 0)
 		exit(1);
-	}
-
 	char buf[BUF_SZ];
 	snprintf(buf, 6, "%d", ggg->daemon_pid);
 	ret = write(pidfile, buf, strlen(buf));
@@ -406,57 +403,42 @@ void sighandler(int s)
 	exit(0);
 }
 
-void init_qm_l_socket(void)
+void init_ss_l_socket(streamingsource_t *ss, uint16_t port)
 {
 	int ret;
 	struct sockaddr_in sa;
 
-	ggg->qm->input_offset = 0;
-
-	ggg->qm->listener = socket (AF_INET, SOCK_STREAM, 0);
-	if (ggg->qm->listener < 0)
+	ss->listener = socket (AF_INET, SOCK_STREAM, 0);
+	if (ss->listener < 0)
 	{
-		LOG("ERROR: socket() for queuing manager: %s\n",
+		LOG("ERROR: socket() for streaming source: %s\n",
 		    strerror(errno));
 		exit(1);
 	}
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family      = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	sa.sin_port        = htons(arguments.port_qm);
+	sa.sin_port        = htons(port);
 
 	ret = 1;
-	if(setsockopt(ggg->qm->listener, SOL_SOCKET, SO_REUSEADDR,
+	if(setsockopt(ss->listener, SOL_SOCKET, SO_REUSEADDR,
 				(char *)&ret, sizeof(ret)) < 0)
 	{
-		LOG("ERROR: setsockopt() for queuing manager: %s\n",
+		LOG("ERROR: setsockopt() for streaming source: %s\n",
 		    strerror(errno));
 		exit(1);
         }
 
-	int bind_retries = 4;
-	while (bind_retries--)
+	if (bind(ss->listener, (struct sockaddr *) &sa, sizeof(sa)) < 0)
 	{
-		ret = bind(ggg->qm->listener, (struct sockaddr *) &sa, sizeof(sa));
-		if (ret < 0)
-		{
-			LOG("MAIN: WARNING: bind() for queuing manager: %s... retrying %d\n",
-					strerror(errno), bind_retries);
-			usleep(1000000);
-		}else
-			break;
-	}
-	if (ret < 0)
-	{
-		LOG("MAIN: WARNING: bind() for queuing manager failed. running without. no movie playing possible\n");
-		ggg->qm->state = NET_ERROR;
+		LOG("MAIN: WARNING: bind() for streaming source failed. running without. no movie playing possible\n");
+		ss->state = NET_ERROR;
 		return;
 	}
 
-	ret = listen(ggg->qm->listener, 8);
-	if (ret < 0)
+	if (listen(ss->listener, 8) < 0)
 	{
-		LOG("ERROR: listen() for queuing manager: %s\n",
+		LOG("ERROR: listen() for streaming source: %s\n",
 		    strerror(errno));
 		exit(1);
 	}
@@ -466,7 +448,6 @@ void init_web_l_socket(void)
 {
 	int ret;
 	struct sockaddr_in sa;
-        int on = 1;
 
 	ggg->web = malloc(sizeof(*ggg->web));
 	if (!ggg->web)
@@ -496,27 +477,14 @@ void init_web_l_socket(void)
 		exit(1);
         }
 
-	int bind_retries = 4;
-	while (bind_retries--)
-	{
-		ret = bind(ggg->web->listener, (struct sockaddr *) &sa, sizeof(sa));
-		if (ret < 0)
-		{
-			LOG("MAIN: WARNING: bind() for web clients: %s... retrying %d\n",
-					strerror(errno), bind_retries);
-			usleep(1000000);
-		}else
-			break;
-	}
-	if (ret < 0)
+	if (bind(ggg->web->listener, (struct sockaddr *) &sa, sizeof(sa)) < 0)
 	{
 		LOG("MAIN: WARNING: bind() for web clients failed. running without. no live streaming possible\n");
 		ggg->web->state = NET_ERROR;
 		return;
 	}
 
-	ret = listen(ggg->web->listener, 8);
-	if (ret < 0)
+	if (listen(ggg->web->listener, 8) < 0)
 	{
 		LOG("ERROR: listen() for web clients: %s\n",
 		    strerror(errno));
@@ -526,7 +494,8 @@ void init_web_l_socket(void)
 
 void init_sockets(void)
 {
-	init_qm_l_socket();
+	init_ss_l_socket(ggg->qm, arguments.port_qm);
+	init_ss_l_socket(ggg->is, arguments.port_is);
 	init_web_l_socket();
 }
 
@@ -554,6 +523,7 @@ void init_streamingsource(streamingsource_t * ss)
 		exit(1);
 	}
 
+	ss->input_offset = 0;
 	ss->state = NET_NOT_CONNECTED;
 }
 
@@ -563,7 +533,7 @@ void init(void)
 	ggg = malloc(sizeof(*ggg));
 	if (!ggg)
 	{
-		printf("ERROR: couldn't alloc %d bytes: %s\n",
+		printf("ERROR: couldn't alloc %lu bytes: %s\n",
 		       sizeof(*ggg),
 		       strerror(errno));
 		exit(1);
@@ -575,24 +545,26 @@ void init(void)
 	ggg->qm = malloc(sizeof(*ggg->qm));
 	if (!ggg->qm)
 	{
-		printf("ERROR: couldn't alloc %d bytes: %s\n",
+		printf("ERROR: couldn't alloc %lu bytes: %s\n",
 		       sizeof(*ggg->qm),
 		       strerror(errno));
 		exit(1);
 	}
 
+	ggg->qm->type = SOURCE_QM;
 	init_streamingsource(ggg->qm);
 
 	/* instant streaming */
 	ggg->is = malloc(sizeof(*ggg->is));
 	if (!ggg->is)
 	{
-		printf("ERROR: couldn't alloc %d bytes: %s\n",
+		printf("ERROR: couldn't alloc %lu bytes: %s\n",
 		       sizeof(*ggg->is),
 		       strerror(errno));
 		exit(1);
 	}
 
+	ggg->is->type = SOURCE_IS;
 	init_streamingsource(ggg->is);
 
 #if 0
@@ -691,21 +663,19 @@ void mainloop(void)
 			}
 		}
 
-#if 0 /* FIXME: IS */
 		/* is instant streamer client, max 1 */
-		if (is_state == NET_NOT_CONNECTED)
+		if (ggg->is->state == NET_NOT_CONNECTED)
 		{
 			FD_SET(ggg->is->listener, &rfd);
 			FD_SET(ggg->is->listener, &efd);
 			nfds = max_int(nfds, ggg->is->listener);
 		}
-		if (is_state == NET_CONNECTED)
+		if (ggg->is->state == NET_CONNECTED)
 		{
 			FD_SET(ggg->is->sock, &rfd);
 			FD_SET(ggg->is->sock, &efd);
 			nfds = max_int(nfds, ggg->is->sock);
 		}
-#endif
 
 		/* web */
 		if (ggg->web->state != NET_ERROR)
@@ -737,7 +707,7 @@ void mainloop(void)
 		{
 			LOG("ERROR: select(): %s\n",
 					strerror(errno));
-			//exit(1);
+			exit(1);
 		}
 
 		for (i=0; i<4; i++)
@@ -765,13 +735,12 @@ void mainloop(void)
 			{
 				LOG("MAIN: WARNING: select() on queuing manager connection: %s\n",
 						strerror(errno));
-				close_qm();
+				close_ss(ggg->qm);
 			}
 		}
 
-#if 0 /* FIXME: IS */
 		/* is instant streamer client, max 1 */
-		if (is_state == NET_NOT_CONNECTED)
+		if (ggg->is->state == NET_NOT_CONNECTED)
 		{
 			if (FD_ISSET(ggg->is->listener, &efd))
 			{
@@ -780,16 +749,15 @@ void mainloop(void)
 				exit(1);
 			}
 		}
-		if (is_state == NET_CONNECTED)
+		if (ggg->is->state == NET_CONNECTED)
 		{
 			if (FD_ISSET(ggg->is->sock, &efd))
 			{
 				LOG("ERROR: select() on instant streamer connection: %s\n",
 						strerror(errno));
-				exit(1);
+				close_ss(ggg->is);
 			}
 		}
-#endif
 
 		if (FD_ISSET(ggg->web->listener, &efd))
 		{
@@ -822,26 +790,25 @@ void mainloop(void)
 		if (ggg->qm->state == NET_NOT_CONNECTED)
 		{
 			if (FD_ISSET(ggg->qm->listener, &rfd))
-				process_qm_l_data();
+				process_ss_l_data(ggg->qm);
 		}
 		if (ggg->qm->state == NET_CONNECTED)
 		{
 			if (FD_ISSET(ggg->qm->sock, &rfd))
-				process_qm_data();
+				process_ss_data(ggg->qm);
 		}
 
-#if 0 /* FIXME: IS */
-		if (is_state == NET_NOT_CONNECTED)
+		if (ggg->is->state == NET_NOT_CONNECTED)
 		{
 			if (FD_ISSET(ggg->is->listener, &rfd))
-				process_is_l_data();
+				process_ss_l_data(ggg->is);
 		}
-		if (is_state == NET_CONNECTED)
+		if (ggg->is->state == NET_CONNECTED)
 		{
 			if (FD_ISSET(ggg->is->sock, &rfd))
-				process_is_data();
+				process_ss_data(ggg->ss);
 		}
-#endif
+
 		if (FD_ISSET(ggg->web->listener, &rfd))
 			process_web_l_data();
 
@@ -870,11 +837,11 @@ void mainloop(void)
 		if ((frame_duration + frame_last_time <= tmp64 ) ||
 		    (frame_last_time == 0))
 		{
-                  /* LOG("Frame timing error: %f%%\n", 100*(1-(double)frame_duration/(frame_remaining+frame_duration))); */
 			frame_last_time = tmp64;
-			next_frame();
+			if(ggg->source != SOURCE_IS)
+				next_frame();
 			frame_remaining = frame_duration;
-		}else{
+		} else {
 			frame_remaining = frame_last_time + frame_duration - tmp64;
 		}
 	}
