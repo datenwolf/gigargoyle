@@ -13,7 +13,7 @@
 
 #define COLS 24
 #define ROWS 4
-#define LP_LEN 5
+#define LP_LEN 2
 #define BUFSIZE 1024
 
 jack_port_t *input_port;
@@ -45,7 +45,7 @@ void draw_spectrum_column(gg_frame* f, unsigned int col, unsigned int amplitude)
     if (row < amplitude) {
       int r, g, b;
       /* "Gradient" */
-      switch (col) {
+      switch (row) {
       case 0:
       case 1:
         r = 0;
@@ -144,7 +144,7 @@ int process (jack_nframes_t nframes, void *arg) {
 
       /* Calculate bar height from amplitude */
       int bar_height = 0;
-      bar_height = (int)round(4*atan(filtered_amplitudes[z]/20.0)/(M_PI/2.0));
+      bar_height = (int)round(4*atan(filtered_amplitudes[z]/40.0)/(M_PI/2.0));
       if (bar_height > 4) bar_height = 4;
       
       /* Do the coloring of current bar from amplitude */
@@ -158,7 +158,7 @@ int process (jack_nframes_t nframes, void *arg) {
   }
 
   /* Finally we can send our frame */
-  if (++cnt % 4 == 0) {
+  if (++cnt % 2 == 0) {
     gg_send_frame((gg_socket *)arg, frame);
   }
 
@@ -184,7 +184,7 @@ int main(int argc, char *argv[]) {
 
   /* Open connection to gigargoyle */
   frame = gg_init_frame(COLS, ROWS, 3);
-  gg_socket = gg_init_socket("localhost", 0xabac);
+  gg_socket = gg_init_socket("localhost", 0xacab);
 
   /* open a client connection to the JACK server */
   client = jack_client_open (client_name, options, &status, server_name);
