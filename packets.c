@@ -155,8 +155,10 @@ void set_pixel_xy_rgb8(
 	bus_buf[8] = 0x31;
 	int ret;
 
+	/* FIXME: doesn't work...
 	if (hdr & PKT_MASK_DBL_BUF)
 		bus_buf[3] = 'P';
+	*/
 
 	timestamp = gettimeofday64();
 
@@ -398,8 +400,10 @@ void handle_packet(pkt_t * p) {
 			return; /* drop unsupported packages */
 	}
 
+	/* FIXME: doesn't work
 	if (p->hdr & PKT_MASK_DBL_BUF)
 		flip_double_buffer();
+	*/
 
 	serve_web_clients();
 }
