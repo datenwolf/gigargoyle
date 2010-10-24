@@ -597,6 +597,7 @@ void init(void)
 	signal(SIGPIPE, sighandler); /* when cleints (players) disconnect between select() and write() */
 
 	init_uarts();
+    send_reset();
 	init_sockets();
 	init_fifo();
 

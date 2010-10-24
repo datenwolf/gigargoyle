@@ -51,6 +51,7 @@
 #define PKT_TYPE_SET_PIXEL          0x10
 #define PKT_TYPE_SET_SCREEN         0x11
 #define PKT_TYPE_FLIP_DBL_BUF       0x12
+#define PKT_TYPE_RESET              0x13
 
 #define PKT_TYPE_TEXT               0x20
 #define PKT_TYPE_SET_FONT           0x21
@@ -86,6 +87,7 @@ void next_frame(void);
 void handle_packet(pkt_t * p);
 void serve_web_clients(void);
 
+void send_reset(void);
 uint8_t shadow_screen[ACAB_Y][ACAB_X][3]; /* for web clients */
 
 #endif /* PACKETS_H */
