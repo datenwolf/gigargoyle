@@ -320,7 +320,7 @@ void send_reset_on_bus(int b)
 	bus_buf[5] = 0x31;
 	int ret;
 
-	ret = write(ggg->uart[y], bus_buf, 6);
+	ret = write(ggg->uart[b], bus_buf, 6);
 	if (ret != 6)
 		LOG("PKTS: WARNING: reset_on_bus() write(bus %d) = %d != 6\n", b, ret);
 }
