@@ -32,6 +32,8 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <sys/resource.h>
+
 
 #include "config.h"
 #include "packets.h"
@@ -284,7 +286,8 @@ void open_logfile(void)
 
 void daemonize(void)
 {
-	int ret;
+	int ret,i,f0,f1,f2;
+	struct rlimit rl;
 
 	switch (fork()) {
 		case 0:
@@ -318,9 +321,14 @@ void daemonize(void)
 		exit(1);
 	}
 
-	close(0);
-	close(1);
-	close(2);
+	if (rl.rlim_max == RLIM_INFINITY)
+		rl.rlim_max = 1024;
+	for (i = 0; i < rl.rlim_max; i++)
+		close(i);
+
+	f0 = open("/dev/null", O_RDWR);
+	f1 = dup(0);
+	f2 = dup(0);
 
 	ggg->daemon_pid = getpid();
 
@@ -339,6 +347,11 @@ void daemonize(void)
 		exit(1);
 	}
 	close(pidfile);
+
+	signal(SIGCHLD,SIG_IGN);
+	signal(SIGTSTP,SIG_IGN);
+	signal(SIGTTOU,SIG_IGN);
+	signal(SIGTTIN,SIG_IGN);
 }
 
 void init_uarts(void)
