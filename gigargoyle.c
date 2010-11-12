@@ -457,7 +457,7 @@ void init_ss_l_socket(streamingsource_t *ss, uint16_t port)
 	}
 }
 
-void init_web_l_socket(void)
+void init_web_l_socket(uint16_t port)
 {
 	int ret;
 	struct sockaddr_in sa;
@@ -479,7 +479,7 @@ void init_web_l_socket(void)
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family      = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	sa.sin_port        = htons(PORT_WEB);
+	sa.sin_port        = htons(port);
 
 	ret = 1;
 	if(setsockopt(ggg->web->listener, SOL_SOCKET, SO_REUSEADDR,
@@ -509,7 +509,7 @@ void init_sockets(void)
 {
 	init_ss_l_socket(ggg->qm, arguments.port_qm);
 	init_ss_l_socket(ggg->is, arguments.port_is);
-	init_web_l_socket();
+	init_web_l_socket(arguments.port_web);
 }
 
 void init_web(void)
