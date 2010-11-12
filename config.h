@@ -43,6 +43,9 @@
 #define PORT_WEB   8080 /* tcp port for live watchers      */
 
 #define MAX_WEB_CLIENTS 24
+#define MAX_IS_KEEPALIVE 60000000 /* maximum time a instant streaming
+				   * client can be connected without
+				   * sending data, in us */
 
 #define STARTUP_FRAME_DURATION 10000 /* in us */
 #define MIN_GAP_BUS_TRANSFERS   1000 /* in us */

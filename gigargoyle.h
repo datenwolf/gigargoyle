@@ -35,6 +35,8 @@ typedef struct streamingsource_s
 	int       listener;       /* file handle for the QM or IS listen()   */
 	int       sock;           /* file handle for the QM or IS accept()ed */
 	int       state;
+	uint64_t  init_timestamp;	/* timestamp when connection was initiated */
+	uint64_t  lastrecv_timestamp;	/* last timestamp when last data was received */
 
 	int       input_offset;
 	uint8_t * buf;

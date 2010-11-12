@@ -172,6 +172,8 @@ void process_ss_l_data(streamingsource_t *ss)
 	}
 	ss->sock = ret;
 	ss->state = NET_CONNECTED;
+	ss->init_timestamp= gettimeofday64();
+	ss->lastrecv_timestamp=ss->init_timestamp;
 
 	if (ggg->source != SOURCE_IS)
 	{
@@ -216,6 +218,7 @@ void process_ss_data(streamingsource_t *ss)
 		return;
 	}
 
+	ss->lastrecv_timestamp=gettimeofday64();
 	pt = (pkt_t *) ss->buf;
 
 	int plen = ret + ss->input_offset;
@@ -769,6 +772,14 @@ void mainloop(void)
 			{
 				LOG("ERROR: select() on instant streamer connection: %s\n",
 						strerror(errno));
+				close_ss(ggg->is);
+			}
+			else if (gettimeofday64() - ggg->is->lastrecv_timestamp > MAX_IS_KEEPALIVE)
+			{
+				/* keepalive testing, because last package
+				 * received long time ago (MAX_IS_KEEPALIVE)
+				 */
+				LOG("WARNING: instant streaming client timeout\n");
 				close_ss(ggg->is);
 			}
 		}
