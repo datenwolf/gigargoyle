@@ -25,20 +25,15 @@
 #include <stdio.h>
 
 #include "packets.h"
+#include "streamingsource.h"
+
+/* Contains parsed command line arguments */
+extern struct arguments arguments;
+
+#define BUF_SZ 4096
 
 FILE * logfp;
 #define LOG(fmt, args...) {fprintf(logfp, fmt, ##args); fflush(logfp);}
-
-typedef struct streamingsource_s
-{
-	uint8_t   type;
-	int       listener;       /* file handle for the QM or IS listen()   */
-	int       sock;           /* file handle for the QM or IS accept()ed */
-	int       state;
-
-	int       input_offset;
-	uint8_t * buf;
-} streamingsource_t;
 
 typedef struct web_s
 {

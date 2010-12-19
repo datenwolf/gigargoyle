@@ -5,7 +5,7 @@ CFLAGS+=-DHAS_ARGP_ERROR  # <- enable these for linux/glibc
 CFLAGS+=-DHAS_ARGP_USAGE  # <- enable these for linux/glibc
 CFLAGS+=-DHAS_ARGP_PARSE  # <- enable these for linux/glibc
 
-OBJS_gg = gigargoyle.o command_line_arguments.o fifo.o packets.o
+OBJS_gg = gigargoyle.o command_line_arguments.o fifo.o packets.o streamingsource.o
 
 OBJS_acabspectrum = acabspectrum.o gg_simple_client.o
 LIBS_acabspectrum = -lm -lfftw3 -ljack
