@@ -33,7 +33,7 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <sys/resource.h>
-
+#include <termios.h>
 
 #include "config.h"
 #include "packets.h"
@@ -357,6 +357,24 @@ void daemonize(void)
 	signal(SIGTTIN,SIG_IGN);
 }
 
+void init_serial(int fd)
+{
+    struct termios tio;
+
+    memset(&tio,0,sizeof(tio));
+    tio.c_iflag=0;
+    tio.c_oflag=0;
+    tio.c_cflag=CS8|CREAD|CLOCAL;
+    tio.c_lflag=0;
+    tio.c_cc[VMIN]=1;
+    tio.c_cc[VTIME]=5;
+
+    cfsetospeed(&tio,B115200);
+    cfsetispeed(&tio,B115200);
+
+    tcsetattr(fd,TCSANOW,&tio);
+}
+
 void init_uarts(void)
 {
 	int uerr[6];
@@ -383,6 +401,8 @@ void init_uarts(void)
 			    i,
 			    strerror(uerr[i]));
 			do_exit = 1;
+		} else {
+		    init_serial(ggg->uart[i]);
 		}
 	}
 	if (do_exit)

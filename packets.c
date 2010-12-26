@@ -143,7 +143,7 @@ void set_pixel_xy_rgb8(
         //if(y % 2 == 1)
         //  x = ACAB_X - 1 - x;
 
-	uint8_t bus_buf[9];
+	uint8_t bus_buf[24];
 	bus_buf[0] = 0x5c;
 	bus_buf[1] = 0x30;
 	bus_buf[2] = 0x1F - x + 0x10*y;
@@ -153,9 +153,25 @@ void set_pixel_xy_rgb8(
 	bus_buf[6] = b;
 	bus_buf[7] = 0x5c;
 	bus_buf[8] = 0x31;
-	int ret;
 
-	printf("%i/%i %x\n", y, x, bus_buf[2]);
+	int bus_buf_len = 9;
+
+	if(bus_buf[2] == 0x60)
+	    bus_buf[2] = 0x70;
+
+	// escaping
+	int i, j;
+	for(i=1; i<bus_buf_len-2; i++) {
+	    if(bus_buf[i] == '\\') {
+		bus_buf_len++;
+		for(j=bus_buf_len-1; j > i+1; j--)
+		    bus_buf[j] = bus_buf[j-1];
+		i++;
+		bus_buf[i] = '\\';
+	    }
+	}
+
+	//printf("%i/%i %x\n", y, x, bus_buf[2]);
 
 	/* FIXME: doesn't work...
 	if (hdr & PKT_MASK_DBL_BUF)
@@ -170,8 +186,7 @@ void set_pixel_xy_rgb8(
 		timestamp = gettimeofday64();
 	}
 
-	ret = write(ggg->uart[y], bus_buf, 9);
-	//printf("%i\n", ggg->uart[y]);
+	int ret = write(ggg->uart[y], bus_buf, bus_buf_len);
 
 	if (ret != 9)
 		LOG("PKTS: WARNING: write(bus %d) = %d != 9\n", y, ret);
