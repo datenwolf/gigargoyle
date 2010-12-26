@@ -146,7 +146,7 @@ void set_pixel_xy_rgb8(
 	uint8_t bus_buf[9];
 	bus_buf[0] = 0x5c;
 	bus_buf[1] = 0x30;
-	bus_buf[2] = x + 0x10;
+	bus_buf[2] = 0x1F - x + 0x10*y;
 	bus_buf[3] = 'C';
 	bus_buf[4] = r;
 	bus_buf[5] = g;
