@@ -36,6 +36,8 @@ struct arguments {
   char *row_1_uart;
   char *row_2_uart;
   char *row_3_uart;
+  char *row_4_uart;
+  char *row_5_uart;
   char *pid_file;
   char *log_file;
 };

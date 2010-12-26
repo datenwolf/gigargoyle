@@ -15,6 +15,8 @@ void init_arguments(struct arguments *args) {
   args->row_1_uart = ROW_1_UART;
   args->row_2_uart = ROW_2_UART;
   args->row_3_uart = ROW_3_UART;
+  args->row_4_uart = ROW_4_UART;
+  args->row_5_uart = ROW_5_UART;
   args->pid_file = PID_FILE;
   args->log_file = LOG_FILE;
   args->acab_x = ACAB_X;
@@ -37,6 +39,8 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     arguments->row_1_uart = "/dev/null";
     arguments->row_2_uart = "/dev/null";
     arguments->row_3_uart = "/dev/null";
+    arguments->row_4_uart = "/dev/null";
+    arguments->row_5_uart = "/dev/null";
 
     break;
   case 'f':
@@ -110,6 +114,12 @@ error_t parse_opt(int key, char *arg, struct argp_state *state) {
     arguments->row_3_uart = arg;
     break;
   case 127+5:
+    arguments->row_4_uart = arg;
+    break;
+  case 127+6:
+    arguments->row_5_uart = arg;
+    break;
+   case 127+7:
     arguments->pid_file = arg;
     break;
   case 'l':

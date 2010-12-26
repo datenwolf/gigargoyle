@@ -359,7 +359,7 @@ void daemonize(void)
 
 void init_uarts(void)
 {
-	int uerr[4];
+	int uerr[6];
 	ggg->uart[0] = open(arguments.row_0_uart, O_RDWR | O_EXCL);
 	uerr[0] = errno;
 	ggg->uart[1] = open(arguments.row_1_uart, O_RDWR | O_EXCL);
@@ -368,10 +368,14 @@ void init_uarts(void)
 	uerr[2] = errno;
 	ggg->uart[3] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
 	uerr[3] = errno;
+	ggg->uart[4] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
+	uerr[4] = errno;
+	ggg->uart[5] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
+	uerr[5] = errno;
 
 	int do_exit = 0;
 	int i;
-	for (i=0; i<4; i++)
+	for (i=0; i<ACAB_Y; i++)
 	{
 		if (ggg->uart[i] < 0)
 		{
@@ -657,10 +661,10 @@ void mainloop(void)
 		FD_ZERO(&efd);
 
 		/* row */
-		for (i=0; i<4; i++)
+		for (i=0; i<ACAB_Y; i++)
 			FD_SET(ggg->uart[i], &efd);
 		nfds = -1;
-		for (i=0; i<4; i++)
+		for (i=0; i<ACAB_Y; i++)
 			nfds = max_int(nfds, ggg->uart[i]);
 
 		/* qm queuing manager, max 1 */
@@ -727,7 +731,7 @@ void mainloop(void)
 			exit(1);
 		}
 
-		for (i=0; i<4; i++)
+		for (i=0; i<ACAB_Y; i++)
 			if (FD_ISSET(ggg->uart[i], &efd))
 			{
 				LOG("ERROR: select() error on tty %d: %s\n",
@@ -808,7 +812,7 @@ void mainloop(void)
 		/* we shouldn't get any data from the master
 		 * (only used in bootstrapping, not our business)
 		 * but at least we log it */
-		for (i=0; i<4; i++)
+		for (i=0; i<ACAB_Y; i++)
 			if (FD_ISSET(ggg->uart[i], &rfd))
 				process_row_data(i);
 

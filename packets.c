@@ -130,8 +130,8 @@ void set_pixel_xy_rgb8(
                   uint16_t x,
                   uint16_t y
                  ){
-	static uint64_t last_timestamp[4] =
-	                {0, 0, 0, 0}; /* FIXME flexible row/bus mapping */
+	static uint64_t last_timestamp[ACAB_Y] =
+	                {0, 0, 0, 0, 0, 0}; /* FIXME flexible row/bus mapping */
 
 	uint64_t       timestamp;
 
@@ -305,7 +305,7 @@ void flip_double_buffer_on_bus(int b)
 void flip_double_buffer(void)
 {
 	int i;
-	for (i=0; i<4; i++)
+	for (i=0; i<ACAB_Y; i++)
 		flip_double_buffer_on_bus(i);
 }
 
@@ -328,7 +328,7 @@ void send_reset_on_bus(int b)
 void send_reset(void)
 {
 	int i;
-	for (i=0; i<4; i++)
+	for (i=0; i<ACAB_Y; i++)
 		send_reset_on_bus(i);
 }
 

@@ -82,7 +82,7 @@ typedef struct gigargoyle_s
 
 	web_t             * web;  /* WEB clients structure */
 
-	int uart[4];               /* file handles for the uarts */
+	int uart[6];               /* file handles for the uarts */
 } gigargoyle_t;
 
 gigargoyle_t * ggg;

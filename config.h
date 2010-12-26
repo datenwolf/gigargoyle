@@ -27,13 +27,14 @@
 #define ROW_1_UART "/dev/acabB"
 #define ROW_2_UART "/dev/acabC"
 #define ROW_3_UART "/dev/acabD"
-/* row 3 is the bottom row */
+#define ROW_4_UART "/dev/acabE"
+#define ROW_5_UART "/dev/acabF"
 
 #define PID_FILE "/var/run/gigargoyle.pid"
 #define LOG_FILE "/var/log/gigargoyle.log"
 
-#define ACAB_X 24
-#define ACAB_Y  4 /*sigh*/
+#define ACAB_X 16
+#define ACAB_Y  6 /*sigh*/
 
 #define FIFO_DEPTH 20*1024 /* number of messages to be q'd    */
 #define FIFO_WIDTH  2*1024 /* more than a MTU should be sane  */
