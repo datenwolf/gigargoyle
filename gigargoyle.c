@@ -172,8 +172,8 @@ void process_ss_l_data(streamingsource_t *ss)
 	}
 	ss->sock = ret;
 	ss->state = NET_CONNECTED;
-	ss->init_timestamp = gettimeofday64();
-	ss->lastrecv_timestamp = ss->init_timestamp;
+	ss->init_timestamp= gettimeofday64();
+	ss->lastrecv_timestamp=ss->init_timestamp;
 
 	if (ggg->source != SOURCE_IS)
 	{
@@ -218,7 +218,7 @@ void process_ss_data(streamingsource_t *ss)
 		return;
 	}
 
-	ss->lastrecv_timestamp = gettimeofday64();
+	ss->lastrecv_timestamp=gettimeofday64();
 	pt = (pkt_t *) ss->buf;
 
 	int plen = ret + ss->input_offset;
