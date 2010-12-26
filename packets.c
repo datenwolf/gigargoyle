@@ -140,8 +140,8 @@ void set_pixel_xy_rgb8(
 	shadow_screen[y][x][2] = b;
 
         /* Mapping hack */
-        if(y % 2 == 1)
-          x = ACAB_X - 1 - x;
+        //if(y % 2 == 1)
+        //  x = ACAB_X - 1 - x;
 
 	uint8_t bus_buf[9];
 	bus_buf[0] = 0x5c;
@@ -154,6 +154,8 @@ void set_pixel_xy_rgb8(
 	bus_buf[7] = 0x5c;
 	bus_buf[8] = 0x31;
 	int ret;
+
+	printf("%i/%i %x\n", y, x, bus_buf[2]);
 
 	/* FIXME: doesn't work...
 	if (hdr & PKT_MASK_DBL_BUF)
@@ -169,6 +171,7 @@ void set_pixel_xy_rgb8(
 	}
 
 	ret = write(ggg->uart[y], bus_buf, 9);
+	//printf("%i\n", ggg->uart[y]);
 
 	if (ret != 9)
 		LOG("PKTS: WARNING: write(bus %d) = %d != 9\n", y, ret);
@@ -328,8 +331,8 @@ void send_reset_on_bus(int b)
 void send_reset(void)
 {
 	int i;
-	for (i=0; i<ACAB_Y; i++)
-		send_reset_on_bus(i);
+	//for (i=0; i<ACAB_Y; i++)
+		//send_reset_on_bus(i);
 }
 
 void next_frame(void)

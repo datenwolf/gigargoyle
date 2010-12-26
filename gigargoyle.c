@@ -368,9 +368,9 @@ void init_uarts(void)
 	uerr[2] = errno;
 	ggg->uart[3] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
 	uerr[3] = errno;
-	ggg->uart[4] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
+	ggg->uart[4] = open(arguments.row_4_uart, O_RDWR | O_EXCL);
 	uerr[4] = errno;
-	ggg->uart[5] = open(arguments.row_3_uart, O_RDWR | O_EXCL);
+	ggg->uart[5] = open(arguments.row_5_uart, O_RDWR | O_EXCL);
 	uerr[5] = errno;
 
 	int do_exit = 0;
