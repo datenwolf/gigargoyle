@@ -32,6 +32,8 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <errno.h>
+#include <sys/resource.h>
+
 
 #include "config.h"
 #include "packets.h"
@@ -170,6 +172,8 @@ void process_ss_l_data(streamingsource_t *ss)
 	}
 	ss->sock = ret;
 	ss->state = NET_CONNECTED;
+	ss->init_timestamp = gettimeofday64();
+	ss->lastrecv_timestamp = ss->init_timestamp;
 
 	if (ggg->source != SOURCE_IS)
 	{
@@ -214,6 +218,7 @@ void process_ss_data(streamingsource_t *ss)
 		return;
 	}
 
+	ss->lastrecv_timestamp = gettimeofday64();
 	pt = (pkt_t *) ss->buf;
 
 	int plen = ret + ss->input_offset;
@@ -284,7 +289,8 @@ void open_logfile(void)
 
 void daemonize(void)
 {
-	int ret;
+	int ret,i,f0,f1,f2;
+	struct rlimit rl;
 
 	switch (fork()) {
 		case 0:
@@ -318,9 +324,14 @@ void daemonize(void)
 		exit(1);
 	}
 
-	close(0);
-	close(1);
-	close(2);
+	if (rl.rlim_max == RLIM_INFINITY)
+		rl.rlim_max = 1024;
+	for (i = 0; i < rl.rlim_max; i++)
+		close(i);
+
+	f0 = open("/dev/null", O_RDWR);
+	f1 = dup(0);
+	f2 = dup(0);
 
 	ggg->daemon_pid = getpid();
 
@@ -339,6 +350,11 @@ void daemonize(void)
 		exit(1);
 	}
 	close(pidfile);
+
+	signal(SIGCHLD,SIG_IGN);
+	signal(SIGTSTP,SIG_IGN);
+	signal(SIGTTOU,SIG_IGN);
+	signal(SIGTTIN,SIG_IGN);
 }
 
 void init_uarts(void)
@@ -444,7 +460,7 @@ void init_ss_l_socket(streamingsource_t *ss, uint16_t port)
 	}
 }
 
-void init_web_l_socket(void)
+void init_web_l_socket(uint16_t port)
 {
 	int ret;
 	struct sockaddr_in sa;
@@ -466,7 +482,7 @@ void init_web_l_socket(void)
 	memset(&sa, 0, sizeof(sa));
 	sa.sin_family      = AF_INET;
 	sa.sin_addr.s_addr = htonl(INADDR_ANY);
-	sa.sin_port        = htons(PORT_WEB);
+	sa.sin_port        = htons(port);
 
 	ret = 1;
 	if(setsockopt(ggg->web->listener, SOL_SOCKET, SO_REUSEADDR,
@@ -496,7 +512,7 @@ void init_sockets(void)
 {
 	init_ss_l_socket(ggg->qm, arguments.port_qm);
 	init_ss_l_socket(ggg->is, arguments.port_is);
-	init_web_l_socket();
+	init_web_l_socket(arguments.port_web);
 }
 
 void init_web(void)
@@ -597,6 +613,7 @@ void init(void)
 	signal(SIGPIPE, sighandler); /* when cleints (players) disconnect between select() and write() */
 
 	init_uarts();
+    send_reset();
 	init_sockets();
 	init_fifo();
 
@@ -755,6 +772,14 @@ void mainloop(void)
 			{
 				LOG("ERROR: select() on instant streamer connection: %s\n",
 						strerror(errno));
+				close_ss(ggg->is);
+			}
+			else if (gettimeofday64() - ggg->is->lastrecv_timestamp > MAX_IS_KEEPALIVE)
+			{
+				/* keepalive testing, because last package
+				 * received long time ago (MAX_IS_KEEPALIVE)
+				 */
+				LOG("WARNING: instant streaming client timeout\n");
 				close_ss(ggg->is);
 			}
 		}

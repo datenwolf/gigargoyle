@@ -309,6 +309,29 @@ void flip_double_buffer(void)
 		flip_double_buffer_on_bus(i);
 }
 
+void send_reset_on_bus(int b)
+{
+	uint8_t bus_buf[6]; //FIXME
+	bus_buf[0] = 0x5c;
+	bus_buf[1] = 0x30;
+	bus_buf[2] = 0x00;
+	bus_buf[3] = 'r';
+	bus_buf[4] = 0x5c;
+	bus_buf[5] = 0x31;
+	int ret;
+
+	ret = write(ggg->uart[b], bus_buf, 6);
+	if (ret != 6)
+		LOG("PKTS: WARNING: reset_on_bus() write(bus %d) = %d != 6\n", b, ret);
+}
+
+void send_reset(void)
+{
+	int i;
+	for (i=0; i<4; i++)
+		send_reset_on_bus(i);
+}
+
 void next_frame(void)
 {
 	pkt_t * p;
@@ -342,6 +365,10 @@ void handle_packet(pkt_t * p) {
 		case PKT_TYPE_SET_SCREEN_RND_COL:
 			set_screen_rnd_col();
 			break;
+
+        case PKT_TYPE_RESET:
+            send_reset();
+            break;
 
 		case PKT_TYPE_SET_SCREEN:
 			if (p->hdr & PKT_MASK_RGB16)
