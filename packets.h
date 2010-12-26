@@ -55,9 +55,6 @@
 #define PKT_TYPE_TEXT               0x20
 #define PKT_TYPE_SET_FONT           0x21
 
-#define PKT_TYPE_ENABLE_IS          0x30
-#define PKT_TYPE_DISABLE_IS         0x31
-
 #define PKT_TYPE_FLUSH_FIFO         0xfd
 
 #define PKT_TYPE_SHUTDOWN           0xfe

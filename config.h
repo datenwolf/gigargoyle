@@ -32,8 +32,8 @@
 #define PID_FILE "/var/run/gigargoyle.pid"
 #define LOG_FILE "/var/log/gigargoyle.log"
 
-#define ACAB_X 16
-#define ACAB_Y  6
+#define ACAB_X 24
+#define ACAB_Y  4 /*sigh*/
 
 #define FIFO_DEPTH 20*1024 /* number of messages to be q'd    */
 #define FIFO_WIDTH  2*1024 /* more than a MTU should be sane  */

@@ -117,12 +117,6 @@ void early_handle_packet(pkt_t * p) {
 		case PKT_TYPE_SHUTDOWN:
 			gigargoyle_shutdown(); /* FIXME only from QM, not from IS */
 			break;
-		case PKT_TYPE_ENABLE_IS:
-			init_ss_l_socket(ggg->is, arguments.port_is);
-			break;
-		case PKT_TYPE_DISABLE_IS:
-			close_ss(ggg->is);
-			break;
 		default:
 			break; /* drop unsupported packages */
 	}
