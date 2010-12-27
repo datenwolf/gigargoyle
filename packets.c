@@ -139,6 +139,8 @@ void set_pixel_xy_rgb8(
 	shadow_screen[y][x][1] = g;
 	shadow_screen[y][x][2] = b;
 
+	y = ACAB_Y - y - 1;
+
         /* Mapping hack */
         //if(y % 2 == 1)
         //  x = ACAB_X - 1 - x;
@@ -155,9 +157,6 @@ void set_pixel_xy_rgb8(
 	bus_buf[8] = 0x31;
 
 	int bus_buf_len = 9;
-
-	if(bus_buf[2] == 0x60)
-	    bus_buf[2] = 0x70;
 
 	// escaping
 	int i, j;
