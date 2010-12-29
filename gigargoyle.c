@@ -144,6 +144,7 @@ void close_ss(streamingsource_t *ss)
 	else if (ggg->source == SOURCE_IS && ss->type == SOURCE_IS &&
 			ggg->qm->state == NET_CONNECTED)
 	{
+		LOG("IS disconnected, switching to QM\n");
 		ggg->source = SOURCE_QM;
 		ggg->ss = ggg->qm;
 	}
@@ -174,13 +175,11 @@ void process_ss_l_data(streamingsource_t *ss)
 	ss->state = NET_CONNECTED;
 	ss->init_timestamp = gettimeofday64();
 	ss->lastrecv_timestamp = ss->init_timestamp;
+	ggg->source = ss->type;
+	ggg->ss = ss;
 
-	if (ggg->source != SOURCE_IS)
-	{
-		ggg->source = ss->type;
-		ggg->ss = ss;
+	if (ss->type == SOURCE_QM)
 		flush_fifo();
-	}
 
 	LOG("MAIN: streaming source connected from %d.%d.%d.%d:%d\n",
 			(ca.sin_addr.s_addr & 0x000000ff) >>  0,
@@ -702,6 +701,8 @@ void mainloop(void)
 				FD_SET(ggg->qm->sock, &efd);
 				nfds = max_int(nfds, ggg->qm->sock);
 			}
+		} else {
+			LOG("QM has errors!\n");
 		}
 
 		/* is instant streamer client, max 1 */
